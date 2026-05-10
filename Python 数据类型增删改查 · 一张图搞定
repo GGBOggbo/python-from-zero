@@ -1,0 +1,309 @@
+# Python 数据类型增删改查 · 一张图搞定 🧠
+
+> 别死记，先看规律，再练几遍就刻进脑子了
+
+---
+
+## 🔑 先记住一个核心规律
+
+```
+可变类型（能改）：list、dict、set   → 增删改查都行
+不可变类型（不能改）：str、tuple     → 只能查，"改"了就是新对象
+```
+
+---
+
+## 📋 一、列表 List —— 最常用，必须滚瓜烂熟
+
+> 你就把它想象成一个**服务器清单**，可以随便增删改
+
+```python
+servers = ["gpu-01", "gpu-02", "gpu-03"]
+```
+
+### 增 ✅
+```python
+# 末尾加一个
+servers.append("gpu-04")
+# → ["gpu-01", "gpu-02", "gpu-03", "gpu-04"]
+
+# 指定位置插入
+servers.insert(1, "cpu-01")
+# → ["gpu-01", "cpu-01", "gpu-02", "gpu-03"]
+
+# 批量加（合并另一个列表）
+servers.extend(["gpu-05", "gpu-06"])
+# 或者用加号
+servers = servers + ["gpu-05", "gpu-06"]
+```
+
+### 删 ❌
+```python
+# 按值删（删第一个匹配的）
+servers.remove("gpu-02")
+
+# 按下标删（并返回被删的值）
+out = servers.pop(1)     # 删第2个
+out = servers.pop()      # 删最后一个
+
+# 按下标删（不需要返回值）
+del servers[0]
+
+# 清空
+servers.clear()
+```
+
+### 改 ✏️
+```python
+# 直接按下标改
+servers[0] = "gpu-new-01"
+
+# 批量改（切片赋值）
+servers[1:3] = ["a", "b", "c"]
+```
+
+### 查 🔍
+```python
+servers[0]          # 取第一个 → "gpu-01"
+servers[-1]         # 取最后一个 → "gpu-03"
+servers[1:3]        # 切片，取第2到第3个
+
+"gpu-01" in servers # 判断存不存在 → True/False
+servers.index("gpu-02")  # 查下标 → 1
+servers.count("gpu-01")  # 数出现几次
+len(servers)        # 总共几个
+```
+
+### 🧠 记忆口诀
+```
+增：append尾巴加，insert指定插，extend批量塞
+删：remove按值删，pop按位弹，del也能干
+改：下标直接改
+查：下标/切片/in/index
+```
+
+---
+
+## 📖 二、字典 Dict —— 第二常用，存配置信息的
+
+> 想象成一个**模型服务配置文件**，key-value 形式
+
+```python
+config = {
+    "model": "qwen-72b",
+    "port": 8000,
+    "gpu_count": 4
+}
+```
+
+### 增 / 改 ✅✏️（操作一样！key不存在就是增，存在就是改）
+```python
+# 直接赋值
+config["max_tokens"] = 2048      # 新key → 增
+config["port"] = 8080            # 已有key → 改
+
+# update 批量增/改
+config.update({"port": 9000, "temperature": 0.7})
+
+# setdefault（不存在才加，存在就不动）
+config.setdefault("port", 6006)  # port已存在，不会改
+config.setdefault("timeout", 30) # timeout不存在，会加上
+```
+
+### 删 ❌
+```python
+# 按key删
+del config["gpu_count"]
+
+# 按key删（并返回值）
+v = config.pop("gpu_count")
+
+# 删最后一个插入的
+config.popitem()
+
+# 清空
+config.clear()
+```
+
+### 查 🔍
+```python
+config["model"]                # 取值（key不存在会报错！）
+config.get("model")            # 取值（不存在返回None，更安全）
+config.get("model", "默认值")  # 不存在返回默认值
+
+config.keys()       # 所有key
+config.values()     # 所有value
+config.items()      # 所有key-value对（常用于遍历）
+
+"model" in config   # 判断key是否存在 → True
+len(config)         # 几个键值对
+```
+
+### 🧠 记忆口诀
+```
+增和改：直接 dict[key] = value 搞定
+删：del / pop / clear
+查：get最安全，keys/values/items 三兄弟
+```
+
+---
+
+## 📝 三、字符串 Str —— 不可变！所有操作返回新字符串
+
+> 想象成一条**日志信息**
+
+```python
+log = "ERROR: GPU-01 out of memory at 2024-01-15 10:30:00"
+```
+
+### "增"（拼接）
+```python
+# 加号拼接
+new = "【告警】" + log
+
+# f-string（最推荐！）
+server = "gpu-01"
+msg = f"服务器 {server} 出问题了"
+
+# join（列表拼成字符串）
+parts = ["gpu-01", "gpu-02", "gpu-03"]
+result = ",".join(parts)   # → "gpu-01,gpu-02,gpu-03"
+```
+
+### "删"（替换为空 = 删除）
+```python
+# 去首尾空白
+log.strip()
+log.lstrip()    # 只去左边
+log.rstrip()    # 只去右边
+
+# 删掉某段内容（替换为空）
+log.replace("ERROR: ", "")
+```
+
+### "改"（替换）
+```python
+# replace
+new_log = log.replace("ERROR", "WARN")
+
+# 大小写
+log.upper()      # 全大写
+log.lower()      # 全小写
+log.title()      # 首字母大写
+```
+
+### 查 🔍
+```python
+log[0]              # 取第一个字符 → "E"
+log[0:5]            # 切片 → "ERROR"
+
+log.find("GPU")     # 找位置 → 7（找不到返回-1）
+log.index("GPU")    # 找位置 → 7（找不到会报错！）
+
+log.startswith("ERROR")  # 是否以ERROR开头 → True
+log.endswith(".log")     # 是否以.log结尾 → False
+
+log.count("o")      # 字符出现次数
+"GPU" in log         # 是否包含 → True
+len(log)             # 字符串长度
+
+# 分割（超常用！）
+log.split(" ")       # 按空格分割 → ["ERROR:", "GPU-01", ...]
+```
+
+### 🧠 记忆口诀
+```
+拼接用 f-string 和 join
+删改都靠 replace
+查找 find/in/split 三件套
+```
+
+---
+
+## 🎯 四、集合 Set —— 去重用的
+
+```python
+# 今天出错的服务器（自动去重）
+error_servers = {"gpu-01", "gpu-02", "gpu-01"}
+# → {"gpu-01", "gpu-02"}  自动去掉重复的
+```
+
+```python
+# 增
+error_servers.add("gpu-03")          # 加一个
+error_servers.update({"a", "b"})     # 加多个
+
+# 删
+error_servers.remove("gpu-01")   # 删（不存在会报错）
+error_servers.discard("gpu-01")  # 删（不存在也不报错，更安全）
+error_servers.pop()              # 随机删一个
+
+# 查
+"gpu-01" in error_servers        # 是否存在
+len(error_servers)               # 几个元素
+
+# 集合运算（最大特色）
+a = {"gpu-01", "gpu-02", "gpu-03"}
+b = {"gpu-02", "gpu-03", "gpu-04"}
+a & b    # 交集 → {"gpu-02", "gpu-03"}
+a | b    # 并集 → {"gpu-01", "gpu-02", "gpu-03", "gpu-04"}
+a - b    # 差集 → {"gpu-01"}
+```
+
+---
+
+## 📦 五、元组 Tuple —— 不可变的列表，知道就行
+
+```python
+# 固定不变的配置
+gpu_ids = (0, 1, 2, 3)
+
+# 只能查，不能增删改
+gpu_ids[0]          # → 0
+gpu_ids[1:3]        # → (1, 2)
+len(gpu_ids)        # → 4
+2 in gpu_ids        # → True
+```
+
+---
+
+## 🗺️ 终极对比速查表（建议截图保存）
+
+| 操作 | List | Dict | Str | Set |
+|------|------|------|-----|-----|
+| **增** | `append/insert/extend` | `d[k]=v / update` | `+ / f"" / join` | `add/update` |
+| **删** | `remove/pop/del` | `del/pop` | `replace("x","")` | `remove/discard` |
+| **改** | `list[i]=x` | `d[k]=v` | `replace` | ❌不能改单个 |
+| **查** | `[i] / in / index` | `get / in / keys` | `find / in / split` | `in` |
+| **长度** | `len()` | `len()` | `len()` | `len()` |
+| **可变?** | ✅ | ✅ | ❌ | ✅ |
+
+---
+
+## 💡 怎么才能记住？
+
+### 别背！用这个方法练 👇
+
+打开编辑器，**给自己出题**，或者让 AI 出题：
+
+```python
+"""
+练习：你有一个服务器列表和一个配置字典
+
+servers = ["gpu-01", "gpu-02", "gpu-03", "cpu-01"]
+config = {"model": "qwen-72b", "port": 8000}
+
+完成以下任务（先自己写，写不出来再查上面的表）：
+1. 给 servers 末尾加一个 "gpu-04"
+2. 删掉 "cpu-01"
+3. 把 "gpu-01" 改成 "gpu-new-01"
+4. 给 config 加一个 "gpu_count": 4
+5. 获取 config 里的 model 值
+6. 判断 "gpu-02" 是否在 servers 里
+7. 把 servers 用逗号拼成一个字符串
+"""
+```
+
+**每天花10分钟做这种小练习，3-5天就能形成肌肉记忆** 💪
+
+先不用全背，**List 和 Dict 搞熟就能覆盖80%的日常场景**，其他的用到了再查就行！
