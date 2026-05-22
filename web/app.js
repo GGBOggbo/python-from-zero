@@ -2270,6 +2270,1299 @@ for f in find_log_files("."):
         return json.dumps(self.config, indent=2, ensure_ascii=False)`
       }
     ]
+  },
+  {
+    id: 11, title: "requests 基础", icon: "D11",
+    tag: "实战", tagClass: "blue",
+    desc: "会用 requests 调本地大模型 API，处理 JSON 响应",
+    sections: [
+      {
+        title: "安装和第一个请求",
+        content: `<div class="text-block"><code>requests</code> 是 Python 最常用的 HTTP 库。调 API、查服务状态、对接大模型，都离不开它。</div>
+<div class="code-block"><div class="code-header"><span class="lang-label">python</span><button class="copy-btn" onclick="copyCode(this)">Copy</button></div><pre><code class="language-python">import requests
+
+# 检查本地 vLLM 服务是否存活
+resp = requests.get("http://localhost:8000/health")
+print(resp.status_code)  # 200 = 正常
+print(resp.text)         # 响应内容</code></pre></div>
+<div class="tip-box info"><p>没有本地服务？没关系，先学语法，后面有模拟示例。</p></div>` },
+      {
+        title: "请求本地大模型 API",
+        content: `<div class="text-block">vLLM 和 SGLang 都兼容 OpenAI 接口。核心是 <code>POST /v1/chat/completions</code>。</div>
+<div class="code-block"><div class="code-header"><span class="lang-label">python</span><button class="copy-btn" onclick="copyCode(this)">Copy</button></div><pre><code class="language-python">import requests, json
+
+data = {
+    "model": "qwen-72b",
+    "messages": [
+        {"role": "system", "content": "你是运维助手"},
+        {"role": "user", "content": "GPU温度过高怎么办？"}
+    ],
+    "temperature": 0.7,
+    "max_tokens": 256
+}
+
+resp = requests.post(
+    "http://localhost:8000/v1/chat/completions",
+    json=data
+)
+result = resp.json()
+print(result["choices"][0]["message"]["content"])</code></pre></div>` },
+      {
+        title: "GET vs POST",
+        content: `<div class="table-wrap"><table><tr><th>方法</th><th>用途</th><th>例子</th></tr>
+<tr><td><code>GET</code></td><td>查询数据</td><td>检查服务健康 /v1/models</td></tr>
+<tr><td><code>POST</code></td><td>提交数据</td><td>发送聊天请求 /v1/chat/completions</td></tr></table></div>
+<div class="code-block"><div class="code-header"><span class="lang-label">python</span><button class="copy-btn" onclick="copyCode(this)">Copy</button></div><pre><code class="language-python"># GET — 查询已加载模型
+resp = requests.get("http://localhost:8000/v1/models")
+for m in resp.json()["data"]:
+    print(m["id"])
+
+# POST — 发送聊天请求
+resp = requests.post("http://localhost:8000/v1/chat/completions",
+    json={"model": "qwen", "messages": [{"role": "user", "content": "hi"}]})</code></pre></div>` },
+      {
+        title: "JSON 处理",
+        content: `<div class="text-block">API 返回的都是 JSON。必须会用 <code>response.json()</code> 解析和提取数据。</div>
+<div class="code-block"><div class="code-header"><span class="lang-label">python</span><button class="copy-btn" onclick="copyCode(this)">Copy</button></div><pre><code class="language-python"># 模拟 API 响应
+mock = {
+    "choices": [{"message": {"content": "检查风扇转速"}}],
+    "usage": {"prompt_tokens": 15, "completion_tokens": 8}
+}
+
+# 提取内容（最常用操作）
+content = mock["choices"][0]["message"]["content"]
+print(f"回复: {content}")
+
+# 提取 token 用量
+usage = mock["usage"]
+print(f"Token: {usage['prompt_tokens']} + {usage['completion_tokens']}")</code></pre></div>` },
+      {
+        title: "实战：检查模型服务状态",
+        content: `<div class="code-block"><div class="code-header"><span class="lang-label">python</span><button class="copy-btn" onclick="copyCode(this)">Copy</button></div><pre><code class="language-python">def check_service(base_url="http://localhost:8000"):
+    try:
+        health = requests.get(f"{base_url}/health", timeout=3)
+        print(f"状态: {'正常' if health.status_code == 200 else '异常'}")
+
+        models = requests.get(f"{base_url}/v1/models", timeout=3)
+        print(f"模型数: {len(models.json()['data'])}")
+    except requests.exceptions.ConnectionError:
+        print("无法连接，服务可能未启动")</code></pre></div>` }
+    ],
+    exercises: [
+      { title: "调 API 获取模型列表", desc: `用 requests.get() 调 http://localhost:8000/v1/models<br>打印所有模型 ID<br>提示: response.json()["data"] 里有模型列表`, answer: `import requests
+try:
+    resp = requests.get("http://localhost:8000/v1/models", timeout=5)
+    for m in resp.json()["data"]:
+        print(f"  - {m['id']}")
+except requests.exceptions.ConnectionError:
+    print("无法连接服务")`, starter: `import requests
+
+# 调用 /v1/models 接口
+# 提示：response.json()["data"] 里有模型列表
+` },
+      { title: "发送聊天请求", desc: `用 requests.post() 调 http://localhost:8000/v1/chat/completions<br>发送 "你好" 消息，打印模型回复<br>提示: 请求体需要 model 和 messages 字段`, answer: `import requests
+
+url = "http://localhost:8000/v1/chat/completions"
+data = {
+    "model": "qwen",
+    "messages": [{"role": "user", "content": "你好"}]
+}
+try:
+    resp = requests.post(url, json=data, timeout=30)
+    print(resp.json()["choices"][0]["message"]["content"])
+except requests.exceptions.ConnectionError:
+    print("无法连接服务")`, starter: `import requests
+
+url = "http://localhost:8000/v1/chat/completions"
+data = {
+    # 补全请求体
+}
+` },
+      { title: "批量检查服务状态", desc: `给定服务列表，逐个检查 /health<br>urls = ["http://gpu-01:8000", "http://gpu-02:8000", "http://gpu-03:8000"]<br>输出每个服务状态`, answer: `import requests
+
+urls = ["http://gpu-01:8000", "http://gpu-02:8000", "http://gpu-03:8000"]
+for url in urls:
+    try:
+        resp = requests.get(f"{url}/health", timeout=3)
+        status = "正常" if resp.status_code == 200 else f"异常({resp.status_code})"
+    except requests.exceptions.ConnectionError:
+        status = "无法连接"
+    except requests.exceptions.Timeout:
+        status = "超时"
+    print(f"{url}: {status}")`, starter: `import requests
+
+urls = ["http://gpu-01:8000", "http://gpu-02:8000", "http://gpu-03:8000"]
+for url in urls:
+    # 检查每个服务的健康状态
+` }
+    ]
+  },
+  {
+    id: 12, title: "requests 进阶", icon: "D12",
+    tag: "实战", tagClass: "blue",
+    desc: "写生产级请求代码：超时、重试、错误处理、流式响应",
+    sections: [
+      {
+        title: "超时设置",
+        content: `<div class="text-block">不设超时 = 请求可能永远卡住。生产环境必须设超时。</div>
+<div class="code-block"><div class="code-header"><span class="lang-label">python</span><button class="copy-btn" onclick="copyCode(this)">Copy</button></div><pre><code class="language-python"># timeout=5         → 连接+读取共 5 秒
+# timeout=(3, 10)   → 连接 3 秒，读取 10 秒
+
+# 推荐值：
+# 健康检查: timeout=(2, 3)
+# 普通查询: timeout=(3, 10)
+# 聊天请求: timeout=(5, 120)
+
+try:
+    resp = requests.get("http://localhost:8000/health", timeout=(2, 3))
+except requests.exceptions.Timeout:
+    print("请求超时！")</code></pre></div>` },
+      {
+        title: "错误处理",
+        content: `<div class="code-block"><div class="code-header"><span class="lang-label">python</span><button class="copy-btn" onclick="copyCode(this)">Copy</button></div><pre><code class="language-python">try:
+    resp = requests.get(url, timeout=3)
+    resp.raise_for_status()  # 4xx/5xx 抛异常
+except requests.exceptions.ConnectionError:
+    print("连接失败：服务未启动")
+except requests.exceptions.Timeout:
+    print("请求超时")
+except requests.exceptions.HTTPError as e:
+    print(f"HTTP错误: {e.response.status_code}")
+except requests.exceptions.RequestException as e:
+    print(f"其他异常: {e}")</code></pre></div>` },
+      {
+        title: "重试机制",
+        content: `<div class="text-block">网络偶尔抖动很正常，重试几次就好。用<strong>指数退避</strong>：1秒、2秒、4秒...</div>
+<div class="code-block"><div class="code-header"><span class="lang-label">python</span><button class="copy-btn" onclick="copyCode(this)">Copy</button></div><pre><code class="language-python">import time
+
+def request_with_retry(url, retries=3, timeout=5):
+    for attempt in range(1, retries + 1):
+        try:
+            resp = requests.get(url, timeout=timeout)
+            resp.raise_for_status()
+            return resp
+        except requests.exceptions.RequestException as e:
+            print(f"第 {attempt} 次失败: {e}")
+            if attempt < retries:
+                time.sleep(2 ** (attempt - 1))  # 指数退避
+    return None</code></pre></div>` },
+      {
+        title: "Session 复用连接",
+        content: `<div class="text-block">用 <code>requests.Session()</code> 复用 TCP 连接，还能统一设置 headers。</div>
+<div class="code-block"><div class="code-header"><span class="lang-label">python</span><button class="copy-btn" onclick="copyCode(this)">Copy</button></div><pre><code class="language-python">with requests.Session() as s:
+    s.headers.update({"Authorization": "Bearer your-token"})
+    # 所有请求共享连接和 headers
+    resp1 = s.get("http://localhost:8000/v1/models")
+    resp2 = s.post("http://localhost:8000/v1/chat/completions",
+                    json=data)</code></pre></div>` },
+      {
+        title: "流式响应 (Streaming)",
+        content: `<div class="text-block">像 ChatGPT 逐字输出一样，用 <code>stream=True</code> 实时获取。</div>
+<div class="code-block"><div class="code-header"><span class="lang-label">python</span><button class="copy-btn" onclick="copyCode(this)">Copy</button></div><pre><code class="language-python">import json
+
+resp = requests.post(url, json=data, stream=True, timeout=120)
+for line in resp.iter_lines():
+    if not line: continue
+    line = line.decode("utf-8")
+    if line.startswith("data: "):
+        payload = line[6:]
+        if payload == "[DONE]": break
+        chunk = json.loads(payload)
+        delta = chunk["choices"][0]["delta"]
+        if "content" in delta:
+            print(delta["content"], end="", flush=True)</code></pre></div>` }
+    ],
+    exercises: [
+      { title: "带超时和重试的请求函数", desc: `写 safe_get(url, timeout=5, retries=3)<br>实现超时+重试+错误处理，返回 response 或 None`, answer: `import requests, time
+
+def safe_get(url, timeout=5, retries=3):
+    for attempt in range(1, retries + 1):
+        try:
+            resp = requests.get(url, timeout=timeout)
+            resp.raise_for_status()
+            return resp
+        except requests.exceptions.RequestException as e:
+            print(f"  第 {attempt}/{retries} 次失败: {type(e).__name__}")
+            if attempt < retries:
+                time.sleep(2 ** (attempt - 1))
+    return None`, starter: `import requests
+import time
+
+def safe_get(url, timeout=5, retries=3):
+    # 实现带超时和重试的 GET 请求
+    pass
+` },
+      { title: "批量检查服务状态（健壮版）", desc: `给定服务列表，用 safe_get 检查每个服务<br>输出状态表格`, answer: `services = [
+    {"name": "vllm-qwen", "url": "http://gpu-01:8000/health"},
+    {"name": "vllm-llama", "url": "http://gpu-02:8000/health"},
+]
+for svc in services:
+    resp = safe_get(svc["url"], timeout=3, retries=2)
+    status = "正常" if resp else "异常"
+    print(f"{svc['name']:<20} {status}")`, starter: `services = [
+    {"name": "vllm-qwen", "url": "http://gpu-01:8000/health"},
+    {"name": "vllm-llama", "url": "http://gpu-02:8000/health"},
+    {"name": "sglang-deepseek", "url": "http://gpu-03:8000/health"},
+]
+# 用 safe_get 检查每个服务
+` },
+      { title: "流式请求示例", desc: `用 stream=True 调 /v1/chat/completions<br>实时打印模型输出`, answer: `import requests, json
+
+url = "http://localhost:8000/v1/chat/completions"
+data = {"model": "qwen", "messages": [{"role": "user", "content": "写一首关于GPU的诗"}], "stream": True}
+try:
+    resp = requests.post(url, json=data, stream=True, timeout=120)
+    for line in resp.iter_lines():
+        if not line: continue
+        line = line.decode("utf-8")
+        if line.startswith("data: "):
+            payload = line[6:]
+            if payload == "[DONE]": break
+            chunk = json.loads(payload)
+            delta = chunk["choices"][0]["delta"]
+            if "content" in delta:
+                print(delta["content"], end="", flush=True)
+    print()
+except Exception as e:
+    print(f"请求失败: {e}")`, starter: `import requests
+import json
+
+url = "http://localhost:8000/v1/chat/completions"
+data = {
+    "model": "qwen",
+    "messages": [{"role": "user", "content": "写一首关于GPU的诗"}],
+    "stream": True
+}
+# 实现流式请求
+` }
+    ]
+  },
+  {
+    id: 13, title: "subprocess — 系统命令", icon: "D13",
+    tag: "实战", tagClass: "blue",
+    desc: "在 Python 里执行 nvidia-smi、docker 等运维命令",
+    sections: [
+      {
+        title: "subprocess.run 基础",
+        content: `<div class="text-block"><code>subprocess.run()</code> 是执行系统命令的标准方式。</div>
+<div class="code-block"><div class="code-header"><span class="lang-label">python</span><button class="copy-btn" onclick="copyCode(this)">Copy</button></div><pre><code class="language-python">import subprocess
+
+result = subprocess.run(["echo", "hello"], capture_output=True, text=True)
+print(result.stdout.strip())   # 输出内容
+print(result.returncode)       # 0 = 成功
+
+# 关键参数：
+# capture_output=True  → 捕获输出
+# text=True            → 输出字符串（不是bytes）
+# timeout=30           → 超时时间</code></pre></div>` },
+      {
+        title: "获取命令输出",
+        content: `<div class="code-block"><div class="code-header"><span class="lang-label">python</span><button class="copy-btn" onclick="copyCode(this)">Copy</button></div><pre><code class="language-python"># 获取 Python 版本
+r = subprocess.run(["python3", "--version"], capture_output=True, text=True)
+print(r.stdout.strip())
+
+# 获取磁盘信息
+r = subprocess.run(["df", "-h", "/"], capture_output=True, text=True)
+print(r.stdout)
+
+# nvidia-smi GPU 信息
+r = subprocess.run(
+    ["nvidia-smi", "--query-gpu=index,utilization.gpu,temperature.gpu",
+     "--format=csv,noheader,nounits"],
+    capture_output=True, text=True
+)
+for line in r.stdout.strip().split("\\n"):
+    print(f"GPU: {line}")</code></pre></div>` },
+      {
+        title: "封装常用函数",
+        content: `<div class="code-block"><div class="code-header"><span class="lang-label">python</span><button class="copy-btn" onclick="copyCode(this)">Copy</button></div><pre><code class="language-python">def run_cmd(cmd, check=False):
+    """执行命令，返回 (成功, 输出, 错误)"""
+    try:
+        if isinstance(cmd, str):
+            cmd = cmd.split()
+        result = subprocess.run(cmd, capture_output=True, text=True, timeout=30)
+        return result.returncode == 0, result.stdout, result.stderr
+    except FileNotFoundError:
+        return False, "", f"命令不存在: {cmd[0]}"
+    except subprocess.TimeoutExpired:
+        return False, "", "超时"
+
+ok, out, err = run_cmd("python3 --version")
+print(f"成功: {ok}, 输出: {out.strip()}")</code></pre></div>` },
+      {
+        title: "实战：GPU 状态巡检",
+        content: `<div class="code-block"><div class="code-header"><span class="lang-label">python</span><button class="copy-btn" onclick="copyCode(this)">Copy</button></div><pre><code class="language-python">def get_gpu_info():
+    ok, out, err = run_cmd([
+        "nvidia-smi",
+        "--query-gpu=index,utilization.gpu,temperature.gpu,memory.used,memory.total",
+        "--format=csv,noheader,nounits"
+    ])
+    if not ok:
+        print(f"失败: {err}")
+        return []
+    gpus = []
+    for line in out.strip().split("\\n"):
+        parts = [p.strip() for p in line.split(",")]
+        gpus.append({"index": parts[0], "util": parts[1],
+                     "temp": parts[2], "mem": f"{parts[3]}/{parts[4]}GB"})
+    return gpus</code></pre></div>` }
+    ],
+    exercises: [
+      { title: "封装 run_cmd 函数", desc: `接收命令字符串或列表<br>返回 (success, stdout, stderr)<br>处理 FileNotFoundError 和 Timeout`, answer: `import subprocess
+
+def run_cmd(cmd, check=False):
+    try:
+        if isinstance(cmd, str):
+            cmd = cmd.split()
+        result = subprocess.run(cmd, capture_output=True, text=True, timeout=30)
+        return result.returncode == 0, result.stdout, result.stderr
+    except FileNotFoundError:
+        return False, "", f"命令不存在: {cmd[0]}"
+    except subprocess.TimeoutExpired:
+        return False, "", "超时"
+    except Exception as e:
+        return False, "", str(e)
+
+ok, out, err = run_cmd("python3 --version")
+print(f"成功: {ok}, 输出: {out.strip()}")`, starter: `import subprocess
+
+def run_cmd(cmd, check=False):
+    # 封装 subprocess.run
+    # 返回 (success: bool, stdout: str, stderr: str)
+    pass
+` },
+      { title: "GPU 信息采集", desc: `调用 nvidia-smi，解析输出<br>打印每张 GPU 的使用率和温度`, answer: `import subprocess
+
+def get_gpu_info():
+    r = subprocess.run(
+        ["nvidia-smi", "--query-gpu=index,utilization.gpu,temperature.gpu,memory.used,memory.total",
+         "--format=csv,noheader,nounits"],
+        capture_output=True, text=True
+    )
+    if r.returncode != 0:
+        print(f"失败: {r.stderr}")
+        return
+    for line in r.stdout.strip().split("\\n"):
+        parts = [p.strip() for p in line.split(", ")]
+        print(f"GPU {parts[0]}: 利用率 {parts[1]}%, 温度 {parts[2]}°C, 显存 {parts[3]}/{parts[4]}GB")
+
+get_gpu_info()`, starter: `import subprocess
+
+def get_gpu_info():
+    # 调用 nvidia-smi --query-gpu=... --format=csv,noheader,nounits
+    # 解析输出
+    pass
+` },
+      { title: "Docker 容器状态检查", desc: `调 docker ps -a<br>输出每个容器的名称、状态、端口映射`, answer: `import subprocess
+
+def check_containers():
+    r = subprocess.run(
+        ["docker", "ps", "-a", "--format", "{{.Names}}\\t{{.Status}}\\t{{.Ports}}"],
+        capture_output=True, text=True
+    )
+    if r.returncode != 0:
+        print(f"失败: {r.stderr}")
+        return
+    print(f"{'容器名':<25} {'状态':<20} {'端口'}")
+    print("-" * 70)
+    for line in r.stdout.strip().split("\\n"):
+        if not line.strip(): continue
+        parts = line.split("\\t")
+        print(f"{parts[0]:<25} {parts[1] if len(parts)>1 else ''}", end="")
+        print(f"  {parts[2] if len(parts)>2 else ''}")
+
+check_containers()`, starter: `import subprocess
+
+def check_containers():
+    # 调用 docker ps -a --format "table {{.Names}}\\t{{.Status}}\\t{{.Ports}}"
+    pass
+` }
+    ]
+  },
+  {
+    id: 14, title: "paramiko 基础 — SSH", icon: "D14",
+    tag: "实战", tagClass: "blue",
+    desc: "用 Python SSH 到远程服务器执行命令、传输文件",
+    sections: [
+      {
+        title: "安装和连接",
+        content: `<div class="text-block"><code>paramiko</code> 是 Python 的 SSH 库。连远程服务器、执行命令、传文件都能搞定。</div>
+<div class="code-block"><div class="code-header"><span class="lang-label">python</span><button class="copy-btn" onclick="copyCode(this)">Copy</button></div><pre><code class="language-python">import paramiko
+
+client = paramiko.SSHClient()
+client.set_missing_host_key_policy(paramiko.AutoAddPolicy())
+
+# 密码连接
+client.connect("gpu-01", username="root", password="xxx", timeout=10)
+
+# 或密钥连接（推荐）
+client.connect("gpu-01", username="root", key_filename="~/.ssh/id_rsa")
+
+# 用完关闭
+client.close()</code></pre></div>` },
+      {
+        title: "执行远程命令",
+        content: `<div class="code-block"><div class="code-header"><span class="lang-label">python</span><button class="copy-btn" onclick="copyCode(this)">Copy</button></div><pre><code class="language-python">stdin, stdout, stderr = client.exec_command("nvidia-smi")
+output = stdout.read().decode("utf-8")
+error = stderr.read().decode("utf-8")
+exit_code = stdout.channel.recv_exit_status()
+
+print(f"输出: {output}")
+print(f"退出码: {exit_code}")</code></pre></div>` },
+      {
+        title: "文件传输 (SFTP)",
+        content: `<div class="code-block"><div class="code-header"><span class="lang-label">python</span><button class="copy-btn" onclick="copyCode(this)">Copy</button></div><pre><code class="language-python">sftp = client.open_sftp()
+
+# 上传
+sftp.put("local_config.yaml", "/etc/vllm/config.yaml")
+
+# 下载
+sftp.get("/var/log/vllm.log", "vllm.log")
+
+sftp.close()</code></pre></div>` },
+      {
+        title: "实战：远程 GPU 检查",
+        content: `<div class="code-block"><div class="code-header"><span class="lang-label">python</span><button class="copy-btn" onclick="copyCode(this)">Copy</button></div><pre><code class="language-python">def check_remote_gpu(host, key_file="~/.ssh/id_rsa"):
+    client = paramiko.SSHClient()
+    client.set_missing_host_key_policy(paramiko.AutoAddPolicy())
+    try:
+        client.connect(host, username="root",
+                       key_filename=key_file, timeout=10)
+        stdin, stdout, stderr = client.exec_command(
+            "nvidia-smi --query-gpu=index,temperature.gpu --format=csv,noheader"
+        )
+        print(f"{host}: {stdout.read().decode().strip()}")
+    finally:
+        client.close()</code></pre></div>` }
+    ],
+    exercises: [
+      { title: "封装 SSH 执行函数", desc: `写 ssh_exec(host, cmd, username="root", key_file=None)<br>返回命令输出字符串`, answer: `import paramiko
+
+def ssh_exec(host, cmd, username="root", password=None, key_file=None):
+    client = paramiko.SSHClient()
+    client.set_missing_host_key_policy(paramiko.AutoAddPolicy())
+    try:
+        kwargs = {"hostname": host, "username": username, "timeout": 10}
+        if key_file: kwargs["key_filename"] = key_file
+        elif password: kwargs["password"] = password
+        client.connect(**kwargs)
+        _, stdout, _ = client.exec_command(cmd)
+        return stdout.read().decode("utf-8")
+    except Exception as e:
+        return f"错误: {e}"
+    finally:
+        client.close()`, starter: `import paramiko
+
+def ssh_exec(host, cmd, username="root", password=None, key_file=None):
+    # 创建 SSH 客户端
+    # 连接服务器
+    # 执行命令
+    # 返回输出
+    pass
+` },
+      { title: "远程检查服务状态", desc: `SSH 到远程服务器<br>执行 systemctl status vllm<br>判断服务是否运行`, answer: `import paramiko
+
+def check_remote_service(host, service="vllm"):
+    client = paramiko.SSHClient()
+    client.set_missing_host_key_policy(paramiko.AutoAddPolicy())
+    try:
+        client.connect(host, username="root", key_filename="~/.ssh/id_rsa", timeout=10)
+        _, stdout, _ = client.exec_command(f"systemctl is-active {service}")
+        status = stdout.read().decode().strip()
+        print(f"{host}: {service} {'运行中' if status == 'active' else status}")
+    except Exception as e:
+        print(f"{host}: 失败 - {e}")
+    finally:
+        client.close()`, starter: `import paramiko
+
+def check_remote_service(host, service_name="vllm"):
+    # SSH 连接远程服务器
+    # 执行 systemctl status <service_name>
+    # 判断服务状态
+    pass
+` },
+      { title: "上传配置文件", desc: `用 SFTP 将本地文件上传到远程服务器`, answer: `import paramiko, os
+
+def upload_config(host, local_path, remote_path):
+    client = paramiko.SSHClient()
+    client.set_missing_host_key_policy(paramiko.AutoAddPolicy())
+    try:
+        client.connect(host, username="root", key_filename="~/.ssh/id_rsa", timeout=10)
+        sftp = client.open_sftp()
+        sftp.put(local_path, remote_path)
+        print(f"上传成功: {local_path} -> {host}:{remote_path}")
+        sftp.close()
+    except FileNotFoundError:
+        print(f"文件不存在: {local_path}")
+    except Exception as e:
+        print(f"失败: {e}")
+    finally:
+        client.close()`, starter: `import paramiko
+import os
+
+def upload_config(host, local_path, remote_path):
+    # SSH 连接
+    # 打开 SFTP
+    # 上传文件
+    pass
+` }
+    ]
+  },
+  {
+    id: 15, title: "paramiko 批量巡检", icon: "D15",
+    tag: "实战", tagClass: "blue",
+    desc: "并发 SSH 多台服务器，汇总巡检结果",
+    sections: [
+      {
+        title: "服务器列表管理",
+        content: `<div class="text-block">用字典列表管理多台服务器，也可以从 JSON 文件读取。</div>
+<div class="code-block"><div class="code-header"><span class="lang-label">python</span><button class="copy-btn" onclick="copyCode(this)">Copy</button></div><pre><code class="language-python">servers = [
+    {"host": "gpu-01", "ip": "10.0.0.1", "username": "root"},
+    {"host": "gpu-02", "ip": "10.0.0.2", "username": "root"},
+    {"host": "gpu-03", "ip": "10.0.0.3", "username": "root"},
+]
+
+# 从 JSON 文件读取
+# import json
+# with open("servers.json") as f:
+#     servers = json.load(f)["servers"]</code></pre></div>` },
+      {
+        title: "并发执行（线程池）",
+        content: `<div class="text-block">串行10台要30秒，并发只要3秒。用 <code>ThreadPoolExecutor</code>。</div>
+<div class="code-block"><div class="code-header"><span class="lang-label">python</span><button class="copy-btn" onclick="copyCode(this)">Copy</button></div><pre><code class="language-python">from concurrent.futures import ThreadPoolExecutor, as_completed
+
+def check_one(srv, command):
+    client = paramiko.SSHClient()
+    client.set_missing_host_key_policy(paramiko.AutoAddPolicy())
+    try:
+        client.connect(srv["ip"], username=srv["username"],
+                       key_filename="~/.ssh/id_rsa", timeout=10)
+        _, stdout, _ = client.exec_command(command)
+        return srv["host"], stdout.read().decode().strip()
+    except Exception as e:
+        return srv["host"], f"失败: {e}"
+    finally:
+        client.close()
+
+# 并发执行
+with ThreadPoolExecutor(max_workers=5) as pool:
+    futures = [pool.submit(check_one, s, "uptime") for s in servers]
+    for f in as_completed(futures):
+        host, output = f.result()
+        print(f"{host}: {output}")</code></pre></div>` },
+      {
+        title: "结果汇总",
+        content: `<div class="code-block"><div class="code-header"><span class="lang-label">python</span><button class="copy-btn" onclick="copyCode(this)">Copy</button></div><pre><code class="language-python">def format_results(results, title="巡检结果"):
+    print(f"\\n{'='*50}")
+    print(f"  {title}")
+    print(f"{'='*50}")
+    ok = sum(1 for r in results.values() if r["success"])
+    print(f"总数: {len(results)}, 成功: {ok}, 失败: {len(results)-ok}")
+    for host, r in results.items():
+        status = "成功" if r["success"] else "失败"
+        print(f"  {host:<15} [{status}]")</code></pre></div>` }
+    ],
+    exercises: [
+      { title: "多机命令执行器", desc: `给定服务器列表和命令<br>批量执行并返回每台的结果`, answer: `import paramiko
+
+def batch_exec(servers, command):
+    results = {}
+    for srv in servers:
+        client = paramiko.SSHClient()
+        client.set_missing_host_key_policy(paramiko.AutoAddPolicy())
+        try:
+            client.connect(srv["host"], username=srv.get("username","root"),
+                         key_filename="~/.ssh/id_rsa", timeout=10)
+            _, stdout, _ = client.exec_command(command)
+            results[srv["host"]] = stdout.read().decode().strip()
+        except Exception as e:
+            results[srv["host"]] = f"失败: {e}"
+        finally:
+            client.close()
+    return results`, starter: `import paramiko
+
+def batch_exec(servers, command):
+    # servers = [{"host": "gpu-01", "username": "root"}, ...]
+    # 批量执行 command
+    # 返回 {host: output} 字典
+    pass
+` },
+      { title: "并发 GPU 巡检", desc: `用 ThreadPoolExecutor 并发检查多台 GPU 服务器<br>汇总结果`, answer: `import paramiko
+from concurrent.futures import ThreadPoolExecutor, as_completed
+
+servers = [
+    {"host": "gpu-01", "username": "root"},
+    {"host": "gpu-02", "username": "root"},
+]
+def check_gpu(srv):
+    client = paramiko.SSHClient()
+    client.set_missing_host_key_policy(paramiko.AutoAddPolicy())
+    try:
+        client.connect(srv["host"], username=srv["username"],
+                     key_filename="~/.ssh/id_rsa", timeout=10)
+        _, stdout, _ = client.exec_command(
+            "nvidia-smi --query-gpu=utilization.gpu,temperature.gpu --format=csv,noheader,nounits")
+        return srv["host"], stdout.read().decode().strip()
+    except Exception as e:
+        return srv["host"], f"失败: {e}"
+    finally:
+        client.close()
+
+with ThreadPoolExecutor(max_workers=3) as pool:
+    for f in as_completed([pool.submit(check_gpu, s) for s in servers]):
+        host, out = f.result()
+        print(f"{host}: {out}")`, starter: `import paramiko
+from concurrent.futures import ThreadPoolExecutor, as_completed
+
+servers = [
+    {"host": "gpu-01", "username": "root"},
+    {"host": "gpu-02", "username": "root"},
+    {"host": "gpu-03", "username": "root"},
+]
+
+def check_gpu(host):
+    # SSH 到主机，执行 nvidia-smi，返回 GPU 信息
+    pass
+
+# 用 ThreadPoolExecutor 并发检查
+` },
+      { title: "生成巡检报告", desc: `将多机巡检结果写入文件<br>格式化输出`, answer: `def generate_report(results, output_file="gpu_report.txt"):
+    from datetime import datetime
+    with open(output_file, "w") as f:
+        f.write(f"GPU 巡检报告 - {datetime.now().strftime('%Y-%m-%d %H:%M')}\\n")
+        f.write("=" * 50 + "\\n")
+        for host, info in results.items():
+            f.write(f"\\n{host}:\\n")
+            if isinstance(info, dict) and info.get("success"):
+                for gpu in info.get("gpus", []):
+                    f.write(f"  GPU {gpu['index']}: {gpu['util']}%, {gpu['temp']}°C\\n")
+            else:
+                f.write(f"  {info}\\n")
+    print(f"报告已写入: {output_file}")`, starter: `def generate_report(results, output_file="gpu_report.txt"):
+    # results = {host: gpu_info_list}
+    # 生成格式化报告
+    # 写入文件
+    pass
+` }
+    ]
+  },
+  {
+    id: 16, title: "docker-py 基础", icon: "D16",
+    tag: "实战", tagClass: "blue",
+    desc: "用 Python 管理 Docker 容器：列出、启动、停止、重启",
+    sections: [
+      {
+        title: "连接 Docker",
+        content: `<div class="code-block"><div class="code-header"><span class="lang-label">python</span><button class="copy-btn" onclick="copyCode(this)">Copy</button></div><pre><code class="language-python">import docker
+
+client = docker.from_env()
+client.ping()  # 测试连接
+
+# 权限问题？sudo usermod -aG docker $USER</code></pre></div>` },
+      {
+        title: "列出容器",
+        content: `<div class="code-block"><div class="code-header"><span class="lang-label">python</span><button class="copy-btn" onclick="copyCode(this)">Copy</button></div><pre><code class="language-python"># 运行中的容器
+for c in client.containers.list():
+    print(f"{c.name}: {c.status} ({c.image.tags})")
+
+# 所有容器（包括停止的）
+for c in client.containers.list(all=True):
+    print(f"{c.name}: {c.status}")
+
+# 按名称过滤
+vllm = client.containers.list(filters={"name": "vllm"})</code></pre></div>` },
+      {
+        title: "容器生命周期",
+        content: `<div class="code-block"><div class="code-header"><span class="lang-label">python</span><button class="copy-btn" onclick="copyCode(this)">Copy</button></div><pre><code class="language-python">c = client.containers.get("vllm-qwen")
+
+c.start()      # 启动
+c.stop()       # 停止
+c.restart()    # 重启
+c.pause()      # 暂停
+c.unpause()    # 恢复
+
+c.reload()     # 刷新状态
+print(c.status)</code></pre></div>` },
+      {
+        title: "镜像管理",
+        content: `<div class="code-block"><div class="code-header"><span class="lang-label">python</span><button class="copy-btn" onclick="copyCode(this)">Copy</button></div><pre><code class="language-python"># 列出镜像
+for img in client.images.list():
+    size_gb = img.attrs["Size"] / (1024**3)
+    print(f"{img.tags}: {size_gb:.1f} GB")
+
+# 拉取镜像
+client.images.pull("vllm/vllm-openai:latest")</code></pre></div>` }
+    ],
+    exercises: [
+      { title: "列出所有容器及状态", desc: `连接 Docker，列出所有容器<br>打印名称、镜像、状态、端口`, answer: `import docker
+
+def list_containers():
+    client = docker.from_env()
+    for c in client.containers.list(all=True):
+        tags = ", ".join(c.image.tags[:1]) if c.image.tags else "&lt;none&gt;"
+        ports = ", ".join(str(p) for p in c.ports.values()) if c.ports else ""
+        print(f"{c.name:<25} {tags:<30} {c.status:<15} {ports}")`, starter: `import docker
+
+def list_containers():
+    # 连接 Docker
+    # 列出所有容器
+    # 打印信息
+    pass
+` },
+      { title: "按名称过滤并重启", desc: `找到名称包含 "vllm" 的容器<br>重启状态异常的`, answer: `import docker
+
+def restart_service_containers(keyword="vllm"):
+    client = docker.from_env()
+    for c in client.containers.list(all=True):
+        if keyword in c.name and c.status != "running":
+            print(f"重启 {c.name} (状态: {c.status})")
+            c.start()
+        elif keyword in c.name:
+            print(f"{c.name} 已在运行")`, starter: `import docker
+
+def restart_service_containers(keyword="vllm"):
+    # 找到名称包含 keyword 的容器
+    # 如果状态不是 running，重启它
+    pass
+` },
+      { title: "批量启停服务", desc: `按列表启停指定容器<br>等待状态变化`, answer: `import docker, time
+
+def manage_containers(names, action="start"):
+    client = docker.from_env()
+    for name in names:
+        try:
+            c = client.containers.get(name)
+            getattr(c, action)()
+            time.sleep(2)
+            c.reload()
+            print(f"{action} {name}: {c.status}")
+        except docker.errors.NotFound:
+            print(f"不存在: {name}")`, starter: `import docker
+import time
+
+def manage_containers(names, action="start"):
+    # action 可以是 "start", "stop", "restart"
+    # 按顺序操作每个容器
+    pass
+` }
+    ]
+  },
+  {
+    id: 17, title: "docker-py 进阶", icon: "D17",
+    tag: "实战", tagClass: "blue",
+    desc: "容器日志分析、资源监控、健康检查、自动重启",
+    sections: [
+      {
+        title: "容器日志",
+        content: `<div class="code-block"><div class="code-header"><span class="lang-label">python</span><button class="copy-btn" onclick="copyCode(this)">Copy</button></div><pre><code class="language-python">c = client.containers.get("vllm-qwen")
+
+# 最近 50 行
+logs = c.logs(tail=50).decode("utf-8")
+
+# 最近 1 小时
+from datetime import datetime, timedelta
+logs = c.logs(since=datetime.now()-timedelta(hours=1))
+
+# 实时跟踪（docker logs -f）
+for line in c.logs(stream=True, follow=True):
+    print(line.decode().strip())</code></pre></div>` },
+      {
+        title: "资源监控",
+        content: `<div class="code-block"><div class="code-header"><span class="lang-label">python</span><button class="copy-btn" onclick="copyCode(this)">Copy</button></div><pre><code class="language-python">stats = container.stats(stream=False)  # 一次快照
+
+# CPU 使用率
+cpu_delta = stats["cpu_stats"]["cpu_usage"]["total_usage"] - \\
+            stats["precpu_stats"]["cpu_usage"]["total_usage"]
+system_delta = stats["cpu_stats"]["system_cpu_usage"] - \\
+               stats["precpu_stats"]["system_cpu_usage"]
+cpu_pct = (cpu_delta / system_delta) * stats["cpu_stats"]["online_cpus"] * 100
+
+# 内存
+mem_used = stats["memory_stats"]["usage"] / (1024**3)
+mem_limit = stats["memory_stats"]["limit"] / (1024**3)</code></pre></div>` },
+      {
+        title: "自动重启异常容器",
+        content: `<div class="code-block"><div class="code-header"><span class="lang-label">python</span><button class="copy-btn" onclick="copyCode(this)">Copy</button></div><pre><code class="language-python">for c in client.containers.list(filters={"status": "running"}):
+    c.reload()
+    health = c.attrs.get("State", {}).get("Health")
+    if health and health["Status"] == "unhealthy":
+        print(f"[告警] {c.name} 不健康，重启中...")
+        c.restart(timeout=10)</code></pre></div>` }
+    ],
+    exercises: [
+      { title: "日志分析函数", desc: `获取容器最近 N 行日志<br>统计 ERROR 出现次数`, answer: `import docker
+
+def analyze_logs(container_name, tail=100):
+    client = docker.from_env()
+    try:
+        c = client.containers.get(container_name)
+        logs = c.logs(tail=tail).decode("utf-8")
+        lines = logs.strip().split("\\n")
+        errors = [l for l in lines if "ERROR" in l.upper()]
+        warnings = [l for l in lines if "WARNING" in l.upper()]
+        print(f"总行数: {len(lines)}")
+        print(f"ERROR: {len(errors)} 次")
+        print(f"WARNING: {len(warnings)} 次")
+    except docker.errors.NotFound:
+        print(f"容器不存在: {container_name}")`, starter: `import docker
+
+def analyze_logs(container_name, tail=100):
+    # 获取容器日志
+    # 统计 ERROR/WARNING 出现次数
+    pass
+` },
+      { title: "容器资源监控", desc: `获取容器 CPU/内存使用率<br>格式化输出`, answer: `import docker
+
+def get_stats(name):
+    client = docker.from_env()
+    try:
+        c = client.containers.get(name)
+        s = c.stats(stream=False)
+        cpu_d = s["cpu_stats"]["cpu_usage"]["total_usage"] - s["precpu_stats"]["cpu_usage"]["total_usage"]
+        sys_d = s["cpu_stats"]["system_cpu_usage"] - s["precpu_stats"]["system_cpu_usage"]
+        cpu = (cpu_d / sys_d) * s["cpu_stats"]["online_cpus"] * 100 if sys_d > 0 else 0
+        mem = s["memory_stats"]["usage"] / (1024**3)
+        lim = s["memory_stats"]["limit"] / (1024**3)
+        print(f"{name}: CPU {cpu:.1f}%, 内存 {mem:.1f}/{lim:.1f}GB")
+    except Exception as e:
+        print(f"失败: {e}")`, starter: `import docker
+
+def get_container_stats(container_name):
+    # 获取容器 stats
+    # 计算 CPU 使用率
+    # 获取内存使用
+    pass
+` },
+      { title: "自动重启异常容器", desc: `检测 unhealthy 的容器<br>自动重启并记录日志`, answer: `import docker
+from datetime import datetime
+
+def auto_restart_unhealthy():
+    client = docker.from_env()
+    log = []
+    for c in client.containers.list(filters={"status": "running"}):
+        c.reload()
+        h = c.attrs.get("State", {}).get("Health")
+        if h and h["Status"] == "unhealthy":
+            msg = f"[{datetime.now().strftime('%H:%M:%S')}] {c.name} 不健康，重启"
+            log.append(msg)
+            print(msg)
+            c.restart(timeout=10)
+    if log:
+        with open("restart.log", "a") as f:
+            for line in log: f.write(line + "\\n")
+    return log`, starter: `import docker
+import time
+from datetime import datetime
+
+def auto_restart_unhealthy():
+    # 找到所有运行中但 unhealthy 的容器
+    # 重启它们
+    # 记录日志
+    pass
+` }
+    ]
+  },
+  {
+    id: 18, title: "schedule 定时任务", icon: "D18",
+    tag: "整合", tagClass: "purple",
+    desc: "定时任务框架，整合 requests/subprocess/paramiko",
+    sections: [
+      {
+        title: "schedule 基础",
+        content: `<div class="code-block"><div class="code-header"><span class="lang-label">python</span><button class="copy-btn" onclick="copyCode(this)">Copy</button></div><pre><code class="language-python">import schedule, time
+
+def job():
+    print("执行巡检...")
+
+schedule.every(30).seconds.do(job)      # 每30秒
+schedule.every(5).minutes.do(job)       # 每5分钟
+schedule.every(1).hours.do(job)         # 每1小时
+schedule.every().day.at("09:00").do(job) # 每天9点
+
+while True:
+    schedule.run_pending()
+    time.sleep(1)</code></pre></div>` },
+      {
+        title: "定时健康检查",
+        content: `<div class="code-block"><div class="code-header"><span class="lang-label">python</span><button class="copy-btn" onclick="copyCode(this)">Copy</button></div><pre><code class="language-python">def check_health():
+    try:
+        resp = requests.get("http://localhost:8000/health", timeout=3)
+        status = "正常" if resp.status_code == 200 else "异常"
+    except Exception:
+        status = "无法连接"
+    print(f"[{datetime.now().strftime('%H:%M:%S')}] API: {status}")
+
+schedule.every(30).seconds.do(check_health)</code></pre></div>` },
+      {
+        title: "日志记录",
+        content: `<div class="code-block"><div class="code-header"><span class="lang-label">python</span><button class="copy-btn" onclick="copyCode(this)">Copy</button></div><pre><code class="language-python">import logging
+from logging.handlers import TimedRotatingFileHandler
+
+# 按天滚动日志
+handler = TimedRotatingFileHandler("monitor.log", when="midnight", backupCount=7)
+handler.setFormatter(logging.Formatter("%(asctime)s [%(levelname)s] %(message)s"))
+
+logger = logging.getLogger("monitor")
+logger.addHandler(handler)
+logger.addHandler(logging.StreamHandler())  # 同时打印到屏幕</code></pre></div>` }
+    ],
+    exercises: [
+      { title: "定时 API 健康检查", desc: `每30秒检查一次服务<br>连续检查5次后退出`, answer: `import schedule, time, requests
+
+count = 0
+def check():
+    global count
+    count += 1
+    try:
+        r = requests.get("http://localhost:8000/health", timeout=3)
+        print(f"[{count}] 状态: {r.status_code}")
+    except Exception as e:
+        print(f"[{count}] 异常: {e}")
+    if count >= 5:
+        return schedule.CancelJob
+
+schedule.every(5).seconds.do(check)
+while len(schedule.get_jobs()) > 0:
+    schedule.run_pending()
+    time.sleep(1)
+print("完成")`, starter: `import schedule
+import time
+import requests
+
+def check_health():
+    # 检查服务健康状态
+    pass
+
+# 设置定时任务
+# 运行 5 次后退出
+` },
+      { title: "综合巡检任务", desc: `结合 subprocess + requests<br>定时采集系统和服务信息`, answer: `import schedule, time, subprocess, requests, logging
+
+logging.basicConfig(level=logging.INFO, format="%(asctime)s %(message)s")
+
+def system_check():
+    r = subprocess.run(["uptime"], capture_output=True, text=True)
+    logging.info(f"系统: {r.stdout.strip()}")
+
+def service_check():
+    try:
+        r = requests.get("http://localhost:8000/health", timeout=3)
+        logging.info(f"API: {r.status_code}")
+    except Exception as e:
+        logging.warning(f"API: {e}")
+
+schedule.every(5).seconds.do(service_check)
+schedule.every(10).seconds.do(system_check)
+
+for _ in range(30):
+    schedule.run_pending()
+    time.sleep(1)`, starter: `import schedule
+import time
+import subprocess
+import requests
+import logging
+
+# 配置日志
+
+def system_check():
+    # 用 subprocess 采集系统信息
+    pass
+
+def service_check():
+    # 用 requests 检查服务状态
+    pass
+
+# 设置定时任务
+` },
+      { title: "可配置定时框架", desc: `从配置列表读取任务<br>动态注册 schedule 任务`, answer: `import schedule, time
+
+def check_health(): print("健康检查")
+def check_gpu(): print("GPU检查")
+
+TASKS = [
+    {"name": "health", "interval": 10, "unit": "seconds", "func": check_health},
+    {"name": "gpu", "interval": 1, "unit": "minutes", "func": check_gpu},
+]
+
+for t in TASKS:
+    u = {"seconds": "seconds", "minutes": "minutes", "hours": "hours"}[t["unit"]]
+    getattr(schedule.every(t["interval"]), u).do(t["func"])
+    print(f"注册: {t['name']} 每 {t['interval']} {t['unit']}")
+
+for _ in range(60):
+    schedule.run_pending()
+    time.sleep(1)`, starter: `import schedule
+import time
+
+TASKS_CONFIG = [
+    {"name": "health_check", "interval": 30, "unit": "seconds", "action": "check_health"},
+    {"name": "gpu_monitor", "interval": 5, "unit": "minutes", "action": "check_gpu"},
+]
+
+def load_tasks(config):
+    # 动态注册定时任务
+    pass
+` }
+    ]
+  },
+  {
+    id: 19, title: "告警推送", icon: "D19",
+    tag: "整合", tagClass: "purple",
+    desc: "通过企业微信/钉钉 Webhook 发送告警消息",
+    sections: [
+      {
+        title: "Webhook 基础",
+        content: `<div class="text-block">Webhook = 一个 URL，POST 请求就能发消息。企业微信和钉钉都支持。</div>
+<div class="code-block"><div class="code-header"><span class="lang-label">python</span><button class="copy-btn" onclick="copyCode(this)">Copy</button></div><pre><code class="language-python">import requests
+
+def send_webhook(url, data):
+    resp = requests.post(url, json=data,
+        headers={"Content-Type": "application/json"}, timeout=10)
+    return resp.json()
+
+# 创建步骤：群设置 → 添加机器人 → 获得 URL</code></pre></div>` },
+      {
+        title: "钉钉消息",
+        content: `<div class="code-block"><div class="code-header"><span class="lang-label">python</span><button class="copy-btn" onclick="copyCode(this)">Copy</button></div><pre><code class="language-python">DINGTALK_URL = "https://oapi.dingtalk.com/robot/send?access_token=xxx"
+
+# 文本消息
+requests.post(DINGTALK_URL, json={
+    "msgtype": "text",
+    "text": {"content": "GPU温度告警: gpu-01 92°C"}
+})
+
+# Markdown 消息
+requests.post(DINGTALK_URL, json={
+    "msgtype": "markdown",
+    "markdown": {
+        "title": "GPU告警",
+        "text": "## GPU 温度告警\\n**温度**: 92°C"
+    }
+})</code></pre></div>` },
+      {
+        title: "企业微信消息",
+        content: `<div class="code-block"><div class="code-header"><span class="lang-label">python</span><button class="copy-btn" onclick="copyCode(this)">Copy</button></div><pre><code class="language-python">WECHAT_URL = "https://qyapi.weixin.qq.com/cgi-bin/webhook/send?key=xxx"
+
+# 文本消息
+requests.post(WECHAT_URL, json={
+    "msgtype": "text",
+    "text": {"content": "服务异常: vllm-qwen 已停止"}
+})
+
+# Markdown 消息
+requests.post(WECHAT_URL, json={
+    "msgtype": "markdown",
+    "markdown": {"content": "## 服务告警\\n> vllm-qwen 状态异常"}
+})</code></pre></div>` },
+      {
+        title: "告警冷却机制",
+        content: `<div class="text-block">防止同一告警疯狂刷屏：5分钟内只发一次。</div>
+<div class="code-block"><div class="code-header"><span class="lang-label">python</span><button class="copy-btn" onclick="copyCode(this)">Copy</button></div><pre><code class="language-python">import time
+
+class Alerter:
+    def __init__(self, cooldown=300):  # 5分钟冷却
+        self.cooldown = cooldown
+        self.last_alert = {}
+
+    def send(self, key, message):
+        now = time.time()
+        if key in self.last_alert:
+            if now - self.last_alert[key] < self.cooldown:
+                return False  # 冷却中
+        self.last_alert[key] = now
+        print(f"[发送] {message}")
+        return True</code></pre></div>` }
+    ],
+    exercises: [
+      { title: "发送钉钉文本告警", desc: `封装函数，发送包含服务器名、告警内容的文本消息`, answer: `import requests
+
+def send_dingtalk_alert(url, server, message):
+    data = {
+        "msgtype": "text",
+        "text": {"content": f"[运维告警] {server}: {message}"}
+    }
+    try:
+        resp = requests.post(url, json=data, timeout=10)
+        return resp.json().get("errcode") == 0
+    except Exception as e:
+        print(f"发送失败: {e}")
+        return False`, starter: `import requests
+
+def send_dingtalk_alert(url, server, message):
+    # 构造钉钉文本消息
+    # 发送 POST 请求
+    pass
+` },
+      { title: "GPU 告警 Markdown", desc: `生成 Markdown 格式的 GPU 告警消息`, answer: `from datetime import datetime
+
+def gpu_alert_md(host, gpu_id, temp, threshold=85):
+    now = datetime.now().strftime("%Y-%m-%d %H:%M")
+    return {
+        "msgtype": "markdown",
+        "markdown": {
+            "title": f"GPU告警-{host}",
+            "text": f"## GPU 温度告警\\n> {now}\\n\\n**服务器**: {host}\\n**GPU**: #{gpu_id}\\n**温度**: {temp}°C (阈值: {threshold}°C)"
+        }
+    }`, starter: `from datetime import datetime
+
+def gpu_alert_markdown(host, gpu_id, temp, threshold=85):
+    # 生成 Markdown 格式的告警消息
+    pass
+` },
+      { title: "带冷却的告警器", desc: `同一告警 5 分钟内不重复发送`, answer: `import time
+
+class CooldownAlerter:
+    def __init__(self, cooldown=300):
+        self.cooldown = cooldown
+        self.last_alert = {}
+
+    def send(self, key, message):
+        now = time.time()
+        if key in self.last_alert:
+            if now - self.last_alert[key] < self.cooldown:
+                print(f"[冷却] {key}")
+                return False
+        self.last_alert[key] = now
+        print(f"[发送] {message}")
+        return True
+
+a = CooldownAlerter(300)
+a.send("gpu-01", "温度 92°C")
+a.send("gpu-01", "温度 93°C")  # 冷却中`, starter: `import time
+
+class CooldownAlerter:
+    def __init__(self, cooldown_seconds=300):
+        self.cooldown_seconds = cooldown_seconds
+        self.last_alert = {}
+
+    def send(self, alert_key, message):
+        # 检查冷却
+        # 发送告警
+        pass
+` }
+    ]
+  },
+  {
+    id: 20, title: "最终项目：监控系统", icon: "D20",
+    tag: "项目", tagClass: "red",
+    desc: "整合 Day 11-19，写一个完整的模型服务监控系统",
+    sections: [
+      {
+        title: "项目架构",
+        content: `<div class="text-block">整合 11-19 天所有技能，构建一个<strong>轻量级模型服务监控系统</strong>。</div>
+<div class="table-wrap"><table><tr><th>模块</th><th>技术</th><th>功能</th></tr>
+<tr><td>健康检查</td><td>requests (Day 11-12)</td><td>检查 API 服务状态</td></tr>
+<tr><td>系统监控</td><td>subprocess (Day 13)</td><td>采集 GPU 信息</td></tr>
+<tr><td>远程巡检</td><td>paramiko (Day 14-15)</td><td>SSH 多机巡检</td></tr>
+<tr><td>容器管理</td><td>docker-py (Day 16-17)</td><td>容器状态+自动重启</td></tr>
+<tr><td>定时调度</td><td>schedule (Day 18)</td><td>定时执行巡检</td></tr>
+<tr><td>告警推送</td><td>webhook (Day 19)</td><td>异常通知</td></tr></table></div>` },
+      {
+        title: "核心代码框架",
+        content: `<div class="code-block"><div class="code-header"><span class="lang-label">python</span><button class="copy-btn" onclick="copyCode(this)">Copy</button></div><pre><code class="language-python">import requests, subprocess, docker, schedule, time, logging
+
+CONFIG = {
+    "services": [
+        {"name": "vllm-qwen", "url": "http://localhost:8000/health"},
+    ],
+    "alert": {"gpu_temp_threshold": 85, "cooldown": 300},
+    "interval": {"health_check": 30, "gpu_check": 60},
+}
+
+def run_full_check():
+    # 1. API 健康检查 (requests)
+    # 2. GPU 状态采集 (subprocess)
+    # 3. 容器状态检查 (docker-py)
+    # 4. 异常告警 (webhook)
+
+schedule.every(30).seconds.do(run_full_check)
+while True:
+    schedule.run_pending()
+    time.sleep(1)</code></pre></div>` },
+      {
+        title: "扩展方向",
+        content: `<div class="text-block">这个监控系统可以持续扩展：</div>
+<div class="tip-box success"><p>
+<strong>Web 界面</strong>：用 Flask 提供状态页面<br>
+<strong>历史数据</strong>：写入 SQLite 保存历史趋势<br>
+<strong>远程巡检</strong>：加入 paramiko 多机检查<br>
+<strong>配置管理</strong>：从 YAML 文件读取配置<br>
+<strong>进程管理</strong>：用 systemd 或 supervisor 守护进程
+</p></div>` }
+    ],
+    exercises: [
+      { title: "添加 SSH 远程巡检", desc: `在监控系统中加入 paramiko 远程巡检功能<br>参考 Day 14-15 的代码`, answer: `import paramiko
+
+def remote_gpu_check(servers):
+    results = {}
+    for srv in servers:
+        client = paramiko.SSHClient()
+        client.set_missing_host_key_policy(paramiko.AutoAddPolicy())
+        try:
+            client.connect(srv["host"], username=srv.get("username","root"),
+                         key_filename="~/.ssh/id_rsa", timeout=10)
+            _, stdout, _ = client.exec_command(
+                "nvidia-smi --query-gpu=temperature.gpu --format=csv,noheader,nounits")
+            temps = stdout.read().decode().strip().split("\\n")
+            results[srv["host"]] = [float(t) for t in temps]
+        except Exception as e:
+            results[srv["host"]] = str(e)
+        finally:
+            client.close()
+    return results`, starter: `import paramiko
+
+def remote_gpu_check(servers):
+    # SSH 到每台服务器
+    # 执行 nvidia-smi
+    # 返回温度数据
+    pass
+` },
+      { title: "添加 Web 状态页面", desc: `用 Flask 提供一个简单的 JSON 状态 API<br>GET /status 返回当前巡检结果`, answer: `from flask import Flask, jsonify
+app = Flask(__name__)
+latest = {}
+
+@app.route("/status")
+def status():
+    return jsonify(latest)
+
+def update_status():
+    global latest
+    latest = {
+        "services": check_api_health(),
+        "gpus": check_gpu_status(),
+        "containers": check_containers(),
+    }
+
+if __name__ == "__main__":
+    import threading
+    threading.Thread(target=lambda: app.run(port=9090), daemon=True).start()
+    while True:
+        update_status()
+        time.sleep(30)`, starter: `# 用 Flask 提供状态页面
+# GET /status 返回巡检结果的 JSON
+pass
+` },
+      { title: "添加历史数据记录", desc: `把每次巡检结果写入 JSON 文件<br>保留最近 7 天的数据`, answer: `import json, os
+from datetime import datetime
+
+def save_history(result, data_dir="history"):
+    os.makedirs(data_dir, exist_ok=True)
+    date_str = datetime.now().strftime("%Y-%m-%d")
+    filepath = os.path.join(data_dir, f"{date_str}.json")
+
+    history = []
+    if os.path.exists(filepath):
+        with open(filepath) as f:
+            history = json.load(f)
+
+    history.append({"time": datetime.now().isoformat(), "data": result})
+
+    with open(filepath, "w") as f:
+        json.dump(history, f, ensure_ascii=False, indent=2)`, starter: `# 把每次巡检结果写入文件
+# 保留最近 7 天的数据
+pass
+` }
+    ]
   }
 ]
 
@@ -2283,10 +3576,11 @@ function saveProgress() {
 }
 
 function updateProgress() {
+  const total = courses.length;
   const done = Object.keys(completed).filter(k => !k.includes('_') && completed[k]).length;
-  const pct = Math.round(done / 10 * 100);
+  const pct = Math.round(done / total * 100);
   document.getElementById('progressFill').style.width = pct + '%';
-  document.getElementById('progressText').textContent = `已完成 ${done}/10 天`;
+  document.getElementById('progressText').textContent = `已完成 ${done}/${total} 天`;
   document.getElementById('progressPct').textContent = pct + '%';
   document.querySelectorAll('.nav-item').forEach(el => {
     const id = parseInt(el.dataset.id);
@@ -2305,10 +3599,10 @@ function updateProgress() {
 }
 
 function getCurrentDay() {
-  for (let i = 1; i <= 10; i++) {
+  for (let i = 1; i <= courses.length; i++) {
     if (!completed[i]) return i;
   }
-  return 10;
+  return courses.length;
 }
 
 // ====== Render Nav ======
@@ -2318,6 +3612,8 @@ function renderNav() {
   courses.forEach(c => {
     if (c.id === 5) html += '<div class="nav-section">核心阶段</div>';
     if (c.id === 9) html += '<div class="nav-section">进阶阶段</div>';
+    if (c.id === 11) html += '<div class="nav-section">实战阶段</div>';
+    if (c.id === 18) html += '<div class="nav-section">整合阶段</div>';
     const isActive = c.id === getCurrentDay() ? 'active' : '';
     html += `<div class="nav-item ${isActive}" data-id="${c.id}" onclick="loadDay(${c.id})">
       <span class="nav-icon pending">${c.icon}</span>
@@ -2390,7 +3686,7 @@ function loadDay(id) {
 
   html += `<div class="nav-buttons">`;
   html += id > 1 ? `<button class="nav-btn secondary" onclick="loadDay(${id-1})">← Day ${id-1}</button>` : '<div></div>';
-  html += id < 10 ? `<button class="nav-btn primary" onclick="loadDay(${id+1})">Day ${id+1} →</button>` : '<div></div>';
+  html += id < courses.length ? `<button class="nav-btn primary" onclick="loadDay(${id+1})">Day ${id+1} →</button>` : '<div></div>';
   html += `</div>`;
 
   document.getElementById('mainContent').innerHTML = `<div class="main-inner">${html}</div>`;
