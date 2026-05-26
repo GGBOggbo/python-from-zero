@@ -1,223 +1,159 @@
 # ============================================================
-# Day 17: docker-py 进阶 — 日志/监控/自动重启
-# 目标：能用 Python 监控容器状态、分析日志、自动处理异常
-# 用法：python day17.py 逐段运行，改一改，看看结果变不变
+# Day 17: subprocess — 在 Python 里跑系统命令
+# 目标：能用 Python 调 nvidia-smi、docker 等运维命令
+# 用法：python day13.py 逐段运行，改一改，看看结果变不变
 # ============================================================
 
-import docker
-import time
-from datetime import datetime
+import subprocess
 
 # --------------------------------------------------
-# 1. 容器日志
+# 1. subprocess.run 基础
 # --------------------------------------------------
+# 最常用的方式，执行一条命令并等待结果
 
-client = docker.from_env()
+result = subprocess.run(["echo", "hello from subprocess"], capture_output=True, text=True)
+print(f"标准输出: {result.stdout.strip()}")
+print(f"返回码: {result.returncode}")  # 0 表示成功
 
-# 获取容器日志
-# container = client.containers.get("vllm-qwen")
-
-# 最近 50 行日志
-# logs = container.logs(tail=50)
-# print(logs.decode("utf-8"))
-
-# 最近 1 小时的日志
-# from datetime import datetime, timedelta
-# since = datetime.now() - timedelta(hours=1)
-# logs = container.logs(since=since, tail=100)
-
-# 实时跟踪日志（类似 docker logs -f）
-# for line in container.logs(stream=True, follow=True):
-#     print(line.decode("utf-8").strip())
+# 关键参数：
+# capture_output=True  → 捕获 stdout 和 stderr
+# text=True            → 输出是字符串（不是 bytes）
+# check=True           → 返回码非 0 时直接抛异常
 
 # --------------------------------------------------
-# 2. 资源监控
+# 2. 获取命令输出
 # --------------------------------------------------
+# 运维最常用：获取命令输出并解析
 
-def get_container_stats(container_name):
-    """获取容器资源使用情况"""
+# 获取当前 Python 版本
+result = subprocess.run(["python3", "--version"], capture_output=True, text=True)
+print(f"Python 版本: {result.stdout.strip()}")
+
+# 获取磁盘使用情况
+result = subprocess.run(["df", "-h", "/"], capture_output=True, text=True)
+print(f"磁盘信息:\n{result.stdout}")
+
+# 模拟解析 nvidia-smi（实际环境取消注释）
+# result = subprocess.run(
+#     ["nvidia-smi", "--query-gpu=index,name,utilization.gpu,temperature.gpu,memory.used,memory.total",
+#      "--format=csv,noheader,nounits"],
+#     capture_output=True, text=True
+# )
+# for line in result.stdout.strip().split("\n"):
+#     parts = line.split(", ")
+#     print(f"GPU {parts[0]}: {parts[1]}, 利用率 {parts[2]}%, 温度 {parts[3]}°C")
+
+# 解析 docker ps 输出
+# result = subprocess.run(
+#     ["docker", "ps", "--format", "table {{.Names}}\t{{.Status}}\t{{.Ports}}"],
+#     capture_output=True, text=True
+# )
+# print(result.stdout)
+
+# --------------------------------------------------
+# 3. 封装常用函数
+# --------------------------------------------------
+# 每次都写 subprocess.run 太长，封装一下
+
+def run_cmd(cmd, check=False):
+    """执行命令，返回 (成功, 标准输出, 错误输出)"""
     try:
-        container = client.containers.get(container_name)
-        stats = container.stats(stream=False)  # 获取一次快照
+        if isinstance(cmd, str):
+            cmd = cmd.split()
+        result = subprocess.run(cmd, capture_output=True, text=True, timeout=30)
+        if check and result.returncode != 0:
+            print(f"命令失败: {' '.join(cmd)}")
+            print(f"错误: {result.stderr}")
+        return result.returncode == 0, result.stdout, result.stderr
+    except FileNotFoundError:
+        return False, "", f"命令不存在: {cmd[0]}"
+    except subprocess.TimeoutExpired:
+        return False, "", "命令执行超时"
 
-        # CPU 使用率计算
-        cpu_delta = stats["cpu_stats"]["cpu_usage"]["total_usage"] - \
-                    stats["precpu_stats"]["cpu_usage"]["total_usage"]
-        system_delta = stats["cpu_stats"]["system_cpu_usage"] - \
-                       stats["precpu_stats"]["system_cpu_usage"]
-        cpu_count = stats["cpu_stats"]["online_cpus"]
+# 使用封装函数
+ok, out, err = run_cmd("python3 --version")
+print(f"成功: {ok}, 输出: {out.strip()}")
 
-        if system_delta > 0 and cpu_delta > 0:
-            cpu_pct = (cpu_delta / system_delta) * cpu_count * 100
-        else:
-            cpu_pct = 0
+# --------------------------------------------------
+# 4. 管道和 shell=True
+# --------------------------------------------------
+# 有时需要管道 | 或 shell 特性，用 shell=True
+# 但 shell=True 有注入风险，尽量不用
 
-        # 内存使用
-        mem_used = stats["memory_stats"]["usage"] / (1024**3)  # GB
-        mem_limit = stats["memory_stats"]["limit"] / (1024**3)
-        mem_pct = (mem_used / mem_limit) * 100
+# 不推荐：shell=True（有安全风险）
+# subprocess.run("ls -la | grep py", shell=True)
 
-        # 网络 IO
-        net_rx = sum(v["rx_bytes"] for v in stats["networks"].values()) / (1024**2)
-        net_tx = sum(v["tx_bytes"] for v in stats["networks"].values()) / (1024**2)
+# 推荐：用列表传参（安全）
+subprocess.run(["ls", "-la"], capture_output=True, text=True)
 
-        return {
-            "cpu_pct": round(cpu_pct, 1),
-            "mem_used_gb": round(mem_used, 2),
-            "mem_limit_gb": round(mem_limit, 2),
-            "mem_pct": round(mem_pct, 1),
-            "net_rx_mb": round(net_rx, 2),
-            "net_tx_mb": round(net_tx, 2),
+# 如果必须用管道，用 Popen 连接
+# p1 = subprocess.Popen(["nvidia-smi"], stdout=subprocess.PIPE)
+# p2 = subprocess.Popen(["grep", "python"], stdin=p1.stdout, stdout=subprocess.PIPE)
+# output = p2.communicate()[0].decode()
+
+# --------------------------------------------------
+# 5. 实际场景：GPU 状态巡检脚本
+# --------------------------------------------------
+
+def get_gpu_info():
+    """获取 GPU 信息（需要 nvidia-smi）"""
+    ok, out, err = run_cmd([
+        "nvidia-smi",
+        "--query-gpu=index,name,utilization.gpu,temperature.gpu,memory.used,memory.total",
+        "--format=csv,noheader,nounits"
+    ])
+
+    if not ok:
+        print(f"获取 GPU 信息失败: {err}")
+        return []
+
+    gpus = []
+    for line in out.strip().split("\n"):
+        if not line.strip():
+            continue
+        parts = [p.strip() for p in line.split(",")]
+        gpu = {
+            "index": int(parts[0]),
+            "name": parts[1],
+            "utilization": float(parts[2]),
+            "temperature": float(parts[3]),
+            "memory_used": float(parts[4]),
+            "memory_total": float(parts[5]),
         }
-    except docker.errors.NotFound:
-        return {"error": f"容器不存在: {container_name}"}
-    except Exception as e:
-        return {"error": str(e)}
+        gpus.append(gpu)
+    return gpus
 
-# stats = get_container_stats("vllm-qwen")
-# if "error" not in stats:
-#     print(f"CPU: {stats['cpu_pct']}%, 内存: {stats['mem_used_gb']}/{stats['mem_limit_gb']}GB ({stats['mem_pct']}%)")
-#     print(f"网络: 接收 {stats['net_rx_mb']}MB, 发送 {stats['net_tx_mb']}MB")
-
-# --------------------------------------------------
-# 3. 健康检查
-# --------------------------------------------------
-
-def check_container_health(container_name):
-    """检查容器健康状态"""
-    try:
-        container = client.containers.get(container_name)
-        container.reload()  # 刷新最新状态
-
-        # 检查是否有健康检查配置
-        health = container.attrs.get("State", {}).get("Health")
-
-        if health is None:
-            return {"status": "no_healthcheck", "healthy": None}
-
-        status = health["Status"]  # starting, healthy, unhealthy
-        failing_streak = health.get("FailingStreak", 0)
-        last_log = health.get("Log", [{}])[-1].get("Output", "")[:200]
-
-        return {
-            "status": status,
-            "healthy": status == "healthy",
-            "failing_streak": failing_streak,
-            "last_log": last_log,
-        }
-    except docker.errors.NotFound:
-        return {"status": "not_found", "healthy": False}
-
-# result = check_container_health("vllm-qwen")
-# print(f"健康状态: {result['status']}")
-
-# --------------------------------------------------
-# 4. 自动重启策略
-# --------------------------------------------------
-
-def get_restart_policy(container_name):
-    """查看容器重启策略"""
-    try:
-        container = client.containers.get(container_name)
-        policy = container.attrs["HostConfig"]["RestartPolicy"]["Name"]
-        return policy
-    except Exception:
-        return None
-
-# 常见重启策略：
-# "no"            → 不自动重启（默认）
-# "always"        → 总是重启
-# "unless-stopped" → 除非手动停止，否则总是重启
-# "on-failure"    → 仅在非零退出码时重启
-
-def auto_restart_unhealthy(max_retries=2):
-    """检测并重启不健康的容器"""
-    containers = client.containers.list(filters={"status": "running"})
-    restarted = []
-
-    for c in containers:
-        health = check_container_health(c.name)
-
-        if health.get("status") == "unhealthy":
-            print(f"[告警] {c.name} 不健康 (连续失败 {health['failing_streak']} 次)")
-
-            if health["failing_streak"] <= max_retries:
-                print(f"  重启 {c.name}...")
-                c.restart(timeout=10)
-                restarted.append(c.name)
-                print(f"  已重启")
-            else:
-                print(f"  超过最大重试次数，跳过（需要人工介入）")
-
-    return restarted
-
-# auto_restart_unhealthy()
-
-# --------------------------------------------------
-# 5. 实际场景：模型服务监控脚本
-# --------------------------------------------------
-
-def monitor_inference_services():
-    """监控所有推理服务容器"""
-    all_c = client.containers.list(all=True)
-    services = [c for c in all_c if "vllm" in c.name or "sglang" in c.name]
-
-    if not services:
-        print("没有找到推理服务容器")
-        return
-
-    print(f"\n{'='*60}")
-    print(f"  推理服务监控 - {datetime.now().strftime('%H:%M:%S')}")
-    print(f"{'='*60}")
-    print(f"{'名称':<20} {'状态':<12} {'CPU':<8} {'内存':<15} {'健康'}")
-    print(f"{'-'*60}")
-
-    for c in services:
-        c.reload()
-        status = c.status
-        health = check_container_health(c.name)
-        health_status = health.get("status", "N/A")
-
-        if status == "running":
-            stats = get_container_stats(c.name)
-            if "error" not in stats:
-                cpu = f"{stats['cpu_pct']}%"
-                mem = f"{stats['mem_used_gb']}/{stats['mem_limit_gb']}GB"
-            else:
-                cpu = "N/A"
-                mem = "N/A"
-        else:
-            cpu = "-"
-            mem = "-"
-
-        print(f"{c.name:<20} {status:<12} {cpu:<8} {mem:<15} {health_status}")
-
-    print(f"{'='*60}")
-
-# monitor_inference_services()
+# 模拟巡检输出（实际环境取消注释 get_gpu_info 调用）
+# gpus = get_gpu_info()
+# print(f"{'GPU':<6} {'名称':<20} {'利用率':<10} {'温度':<10} {'显存':<15}")
+# print("-" * 65)
+# for g in gpus:
+#     mem_pct = g['memory_used'] / g['memory_total'] * 100
+#     print(f"{g['index']:<6} {g['name']:<20} {g['utilization']:.0f}%{'':<6} "
+#           f"{g['temperature']:.0f}°C{'':<5} {g['memory_used']}/{g['memory_total']}GB ({mem_pct:.0f}%)")
 
 # --------------------------------------------------
 # 6. 小练习（先自己写，写不出再看下面的参考答案）
 # --------------------------------------------------
 
-# 练习1：日志分析函数
-# 获取容器最近 N 行日志，统计 ERROR 出现次数
+# 练习1：封装 run_cmd 函数
+# 接收命令字符串或列表，返回 (success, stdout, stderr)，处理异常
 
 # ====== 在这里写你的代码 ======
 
 
 
 
-# 练习2：容器资源监控
-# 获取容器 CPU/内存使用率，格式化输出
+# 练习2：GPU 信息采集脚本
+# 调用 nvidia-smi，解析输出，打印每张 GPU 的使用率和温度
 
 # ====== 在这里写你的代码 ======
 
 
 
 
-# 练习3：自动重启异常容器
-# 检测状态异常的容器，自动重启，记录操作日志
+# 练习3：Docker 容器状态检查
+# 调 docker ps -a，输出每个容器的名称、状态、端口映射
 
 # ====== 在这里写你的代码 ======
 
@@ -227,74 +163,73 @@ def monitor_inference_services():
 # --------------------------------------------------
 # 练习1 参考答案（先自己写！）
 # --------------------------------------------------
-# import docker
+# import subprocess
 #
-# def analyze_logs(container_name, tail=100):
-#     client = docker.from_env()
+# def run_cmd(cmd, check=False):
 #     try:
-#         container = client.containers.get(container_name)
-#         logs = container.logs(tail=tail).decode("utf-8")
-#         lines = logs.strip().split("\n")
-#         errors = [l for l in lines if "ERROR" in l.upper()]
-#         warnings = [l for l in lines if "WARNING" in l.upper()]
-#         print(f"日志统计 ({tail} 行):")
-#         print(f"  总行数: {len(lines)}")
-#         print(f"  ERROR: {len(errors)} 次")
-#         print(f"  WARNING: {len(warnings)} 次")
-#         if errors:
-#             print(f"\n最近 ERROR:")
-#             for e in errors[-3:]:
-#                 print(f"  {e[:150]}")
-#     except docker.errors.NotFound:
-#         print(f"容器不存在: {container_name}")
+#         if isinstance(cmd, str):
+#             cmd = cmd.split()
+#         result = subprocess.run(cmd, capture_output=True, text=True, timeout=30)
+#         return result.returncode == 0, result.stdout, result.stderr
+#     except FileNotFoundError:
+#         return False, "", f"命令不存在: {cmd[0]}"
+#     except subprocess.TimeoutExpired:
+#         return False, "", "命令执行超时"
+#     except Exception as e:
+#         return False, "", str(e)
+#
+# # 测试
+# ok, out, err = run_cmd("python3 --version")
+# print(f"成功: {ok}, 输出: {out.strip()}")
 
 # --------------------------------------------------
 # 练习2 参考答案（先自己写！）
 # --------------------------------------------------
-# import docker
+# import subprocess
 #
-# def get_container_stats(container_name):
-#     client = docker.from_env()
-#     try:
-#         container = client.containers.get(container_name)
-#         stats = container.stats(stream=False)
-#         cpu_delta = stats["cpu_stats"]["cpu_usage"]["total_usage"] - \
-#                     stats["precpu_stats"]["cpu_usage"]["total_usage"]
-#         system_delta = stats["cpu_stats"]["system_cpu_usage"] - \
-#                        stats["precpu_stats"]["system_cpu_usage"]
-#         cpu_count = stats["cpu_stats"]["online_cpus"]
-#         cpu_pct = (cpu_delta / system_delta) * cpu_count * 100 if system_delta > 0 else 0
-#         mem_used = stats["memory_stats"]["usage"] / (1024**3)
-#         mem_limit = stats["memory_stats"]["limit"] / (1024**3)
-#         print(f"{container_name}: CPU {cpu_pct:.1f}%, 内存 {mem_used:.1f}/{mem_limit:.1f}GB")
-#     except Exception as e:
-#         print(f"获取失败: {e}")
+# def get_gpu_info():
+#     result = subprocess.run(
+#         ["nvidia-smi", "--query-gpu=index,utilization.gpu,temperature.gpu,memory.used,memory.total",
+#          "--format=csv,noheader,nounits"],
+#         capture_output=True, text=True
+#     )
+#     if result.returncode != 0:
+#         print(f"执行失败: {result.stderr}")
+#         return
+#
+#     print(f"{'GPU':<6} {'利用率':<10} {'温度':<10} {'显存使用':<15}")
+#     print("-" * 45)
+#     for line in result.stdout.strip().split("\n"):
+#         parts = [p.strip() for p in line.split(", ")]
+#         mem_pct = float(parts[3]) / float(parts[4]) * 100
+#         print(f"{parts[0]:<6} {parts[1]}%{'':<6} {parts[2]}°C{'':<5} "
+#               f"{parts[3]}/{parts[4]}GB ({mem_pct:.0f}%)")
+#
+# get_gpu_info()
 
 # --------------------------------------------------
 # 练习3 参考答案（先自己写！）
 # --------------------------------------------------
-# import docker
-# import time
-# from datetime import datetime
+# import subprocess
 #
-# def auto_restart_unhealthy():
-#     client = docker.from_env()
-#     containers = client.containers.list(filters={"status": "running"})
-#     log_lines = []
-#     for c in containers:
-#         c.reload()
-#         health = c.attrs.get("State", {}).get("Health")
-#         if health and health["Status"] == "unhealthy":
-#             msg = f"[{datetime.now().strftime('%H:%M:%S')}] {c.name} 不健康，正在重启"
-#             log_lines.append(msg)
-#             print(msg)
-#             c.restart(timeout=10)
-#             msg2 = f"[{datetime.now().strftime('%H:%M:%S')}] {c.name} 重启完成"
-#             log_lines.append(msg2)
-#             print(msg2)
-#     # 写入日志文件
-#     if log_lines:
-#         with open("restart.log", "a") as f:
-#             for line in log_lines:
-#                 f.write(line + "\n")
-#     return log_lines
+# def check_containers():
+#     result = subprocess.run(
+#         ["docker", "ps", "-a", "--format", "{{.Names}}\t{{.Status}}\t{{.Ports}}"],
+#         capture_output=True, text=True
+#     )
+#     if result.returncode != 0:
+#         print(f"执行失败: {result.stderr}")
+#         return
+#
+#     print(f"{'容器名':<25} {'状态':<20} {'端口'}")
+#     print("-" * 70)
+#     for line in result.stdout.strip().split("\n"):
+#         if not line.strip():
+#             continue
+#         parts = line.split("\t")
+#         name = parts[0] if len(parts) > 0 else ""
+#         status = parts[1] if len(parts) > 1 else ""
+#         ports = parts[2] if len(parts) > 2 else ""
+#         print(f"{name:<25} {status:<20} {ports}")
+#
+# check_containers()

@@ -1,226 +1,176 @@
 # ============================================================
-# Day 15: paramiko 批量 — 多机巡检
-# 目标：能同时管理多台服务器，并发执行命令
-# 用法：python day15.py 逐段运行，改一改，看看结果变不变
+# Day 15: requests 基础 — 调 vLLM/SGLang API
+# 目标：会用 requests 库调本地大模型 API
+# 用法：python day11.py 逐段运行，改一改，看看结果变不变
 # ============================================================
 
-import paramiko
-from concurrent.futures import ThreadPoolExecutor, as_completed
-import time
+import requests
 import json
 
 # --------------------------------------------------
-# 1. 服务器列表管理
+# 1. 安装和第一个请求
 # --------------------------------------------------
-# 用字典列表管理多台服务器信息
+# pip install requests
+# 最常用的 HTTP 库，调 API 必备
 
-# 服务器清单
-servers = [
-    {"host": "gpu-01", "ip": "10.0.0.1", "username": "root", "role": "inference"},
-    {"host": "gpu-02", "ip": "10.0.0.2", "username": "root", "role": "inference"},
-    {"host": "gpu-03", "ip": "10.0.0.3", "username": "root", "role": "training"},
-]
+# 检查本地 vLLM 服务是否活着（最简单的 GET 请求）
+# 如果你有本地部署的 vLLM/SGLang，取消下面的注释运行
+# response = requests.get("http://localhost:8000/health")
+# print(response.status_code)  # 200 表示正常
+# print(response.text)         # 响应内容
 
-# 也可以从 JSON 文件读取
-config = {
-    "servers": servers,
-    "ssh_key": "~/.ssh/id_rsa",
-    "timeout": 10,
+# 没有服务也不要紧，先学语法
+# 模拟一个请求（用公开测试 API）
+try:
+    resp = requests.get("https://httpbin.org/get", timeout=5)
+    print(f"状态码: {resp.status_code}")
+    print(f"响应类型: {type(resp.text)}")
+    print(f"响应长度: {len(resp.text)} 字符")
+except requests.exceptions.ConnectionError:
+    print("网络不可用，没关系，看下面的代码学语法就行")
+
+# --------------------------------------------------
+# 2. 请求本地大模型 API
+# --------------------------------------------------
+# vLLM 和 SGLang 都兼容 OpenAI 接口
+# 核心接口: POST /v1/chat/completions
+
+# 请求体结构（这就是你每天用的 ChatGPT 背后发生的事）
+chat_request = {
+    "model": "qwen-72b",              # 模型名
+    "messages": [                      # 对话历史
+        {"role": "system", "content": "你是一个运维助手"},
+        {"role": "user", "content": "GPU 温度过高怎么办？"}
+    ],
+    "temperature": 0.7,               # 0=确定，1=随机，推荐 0.7
+    "max_tokens": 256,                # 最多生成多少 token
 }
-print("服务器清单:")
-print(json.dumps(config, ensure_ascii=False, indent=2))
 
-# 从文件读取的写法
-# with open("servers.json") as f:
-#     config = json.load(f)
-#     servers = config["servers"]
+print("\n请求体示例:")
+print(json.dumps(chat_request, ensure_ascii=False, indent=2))
 
-# --------------------------------------------------
-# 2. 批量执行命令（串行）
-# --------------------------------------------------
-# 最简单的批量：循环遍历
-
-def batch_exec_serial(servers, command, key_file="~/.ssh/id_rsa"):
-    """串行批量执行命令"""
-    results = {}
-
-    for srv in servers:
-        client = paramiko.SSHClient()
-        client.set_missing_host_key_policy(paramiko.AutoAddPolicy())
-        try:
-            client.connect(
-                srv["ip"], username=srv["username"],
-                key_filename=key_file, timeout=10
-            )
-            stdin, stdout, stderr = client.exec_command(command)
-            output = stdout.read().decode("utf-8").strip()
-            results[srv["host"]] = {"success": True, "output": output}
-            print(f"{srv['host']}: OK")
-        except Exception as e:
-            results[srv["host"]] = {"success": False, "output": str(e)}
-            print(f"{srv['host']}: 失败 - {e}")
-        finally:
-            client.close()
-
-    return results
-
-# results = batch_exec_serial(servers, "uptime")
+# 实际发送请求（取消注释运行）
+# url = "http://localhost:8000/v1/chat/completions"
+# response = requests.post(url, json=chat_request)
+# result = response.json()
+# print(result["choices"][0]["message"]["content"])
 
 # --------------------------------------------------
-# 3. 并发执行（线程池）
+# 3. GET vs POST
 # --------------------------------------------------
-# 串行太慢！10台机器每台等3秒就要30秒
-# 用线程池并发执行，10台同时跑只要3秒
+# GET：查询数据，不发送 body
+# POST：提交数据，body 里带 JSON
 
-def ssh_exec_one(srv, command, key_file="~/.ssh/id_rsa"):
-    """SSH 到一台机器执行命令"""
-    client = paramiko.SSHClient()
-    client.set_missing_host_key_policy(paramiko.AutoAddPolicy())
-    try:
-        client.connect(
-            srv["ip"], username=srv["username"],
-            key_filename=key_file, timeout=10
-        )
-        stdin, stdout, stderr = client.exec_command(command)
-        output = stdout.read().decode("utf-8").strip()
-        return srv["host"], {"success": True, "output": output}
-    except Exception as e:
-        return srv["host"], {"success": False, "output": str(e)}
-    finally:
-        client.close()
+# GET 示例 — 查询已加载的模型列表
+# resp = requests.get("http://localhost:8000/v1/models")
+# models = resp.json()
+# for m in models["data"]:
+#     print(m["id"])
 
-def batch_exec_parallel(servers, command, max_workers=5, key_file="~/.ssh/id_rsa"):
-    """并发批量执行命令"""
-    results = {}
+# POST 示例 — 发送聊天请求
+# headers = {"Content-Type": "application/json"}
+# resp = requests.post(
+#     "http://localhost:8000/v1/chat/completions",
+#     json=chat_request,
+#     headers=headers,
+# )
 
-    with ThreadPoolExecutor(max_workers=max_workers) as pool:
-        futures = {
-            pool.submit(ssh_exec_one, srv, command, key_file): srv["host"]
-            for srv in servers
+# 简单记忆：
+# GET  = "给我看看"（查数据）
+# POST = "帮我处理"（提交数据）
+
+# --------------------------------------------------
+# 4. JSON 处理
+# --------------------------------------------------
+# API 返回的都是 JSON，必须会解析
+
+# 模拟一个 API 响应
+mock_response = {
+    "id": "chatcmpl-123",
+    "object": "chat.completion",
+    "model": "qwen-72b",
+    "choices": [
+        {
+            "index": 0,
+            "message": {
+                "role": "assistant",
+                "content": "GPU 温度过高时建议：1. 检查风扇转速 2. 降低推理并发 3. 检查环境温度"
+            },
+            "finish_reason": "stop"
         }
+    ],
+    "usage": {
+        "prompt_tokens": 15,
+        "completion_tokens": 30,
+        "total_tokens": 45
+    }
+}
 
-        for future in as_completed(futures):
-            host, result = future.result()
-            results[host] = result
-            status = "OK" if result["success"] else "失败"
-            print(f"  {host}: {status}")
+# 从响应中提取内容（这是最常用的操作）
+content = mock_response["choices"][0]["message"]["content"]
+print(f"\n模型回复: {content}")
 
-    return results
-
-# results = batch_exec_parallel(servers, "uptime", max_workers=3)
-
-# --------------------------------------------------
-# 4. 结果汇总和格式化
-# --------------------------------------------------
-
-def format_results(results, title="巡检结果"):
-    """格式化输出巡检结果"""
-    print(f"\n{'='*50}")
-    print(f"  {title}")
-    print(f"{'='*50}")
-
-    success_count = sum(1 for r in results.values() if r["success"])
-    print(f"总数: {len(results)}, 成功: {success_count}, 失败: {len(results) - success_count}")
-    print(f"{'-'*50}")
-
-    for host, result in results.items():
-        status = "成功" if result["success"] else "失败"
-        output = result["output"][:100]  # 截断过长的输出
-        print(f"  {host:<15} [{status}] {output}")
-
-    print(f"{'='*50}")
-
-# format_results(results, "Uptime 巡检")
+# 提取 token 用量
+usage = mock_response["usage"]
+print(f"Token 用量: 输入{usage['prompt_tokens']} + 输出{usage['completion_tokens']} = {usage['total_tokens']}")
 
 # --------------------------------------------------
-# 5. 实际场景：多机 GPU 巡检
+# 5. 实际场景：检查模型服务状态
 # --------------------------------------------------
+# 运维最常做的事：检查服务是否正常、加载了哪些模型
 
-def gpu_check_one(srv, key_file="~/.ssh/id_rsa"):
-    """检查一台机器的 GPU 状态"""
-    client = paramiko.SSHClient()
-    client.set_missing_host_key_policy(paramiko.AutoAddPolicy())
+def check_model_service(base_url="http://localhost:8000"):
+    """检查模型服务状态"""
     try:
-        client.connect(
-            srv["ip"], username=srv["username"],
-            key_filename=key_file, timeout=10
-        )
-        cmd = ("nvidia-smi --query-gpu=index,utilization.gpu,"
-               "temperature.gpu,memory.used,memory.total "
-               "--format=csv,noheader,nounits")
-        stdin, stdout, stderr = client.exec_command(cmd)
-        output = stdout.read().decode("utf-8").strip()
+        # 检查健康状态
+        health = requests.get(f"{base_url}/health", timeout=3)
+        print(f"服务状态: {'正常' if health.status_code == 200 else '异常'}")
 
-        gpus = []
-        alerts = []
-        for line in output.split("\n"):
-            parts = [p.strip() for p in line.split(", ")]
-            if len(parts) < 5:
-                continue
-            gpu = {
-                "index": parts[0],
-                "util": float(parts[1]),
-                "temp": float(parts[2]),
-                "mem_used": float(parts[3]),
-                "mem_total": float(parts[4]),
-            }
-            gpus.append(gpu)
-            # 温度告警
-            if gpu["temp"] >= 85:
-                alerts.append(f"GPU {gpu['index']} 温度 {gpu['temp']}°C 过高!")
+        # 获取模型列表
+        models_resp = requests.get(f"{base_url}/v1/models", timeout=3)
+        models = models_resp.json()
 
-        return srv["host"], {
-            "success": True,
-            "gpus": gpus,
-            "alerts": alerts,
-        }
+        print(f"已加载模型: {len(models['data'])} 个")
+        for m in models["data"]:
+            print(f"  - {m['id']}")
+
+    except requests.exceptions.ConnectionError:
+        print(f"无法连接 {base_url}，服务可能未启动")
+    except requests.exceptions.Timeout:
+        print(f"连接 {base_url} 超时")
     except Exception as e:
-        return srv["host"], {"success": False, "error": str(e)}
-    finally:
-        client.close()
+        print(f"检查失败: {e}")
 
-def batch_gpu_check(servers, max_workers=5):
-    """并发多机 GPU 巡检"""
-    results = {}
-    with ThreadPoolExecutor(max_workers=max_workers) as pool:
-        futures = [pool.submit(gpu_check_one, srv) for srv in servers]
-        for future in as_completed(futures):
-            host, result = future.result()
-            results[host] = result
-    return results
-
-# results = batch_gpu_check(servers, max_workers=3)
-# for host, r in results.items():
-#     if r["success"]:
-#         print(f"\n{host}:")
-#         for gpu in r["gpus"]:
-#             print(f"  GPU {gpu['index']}: 利用率 {gpu['util']}%, 温度 {gpu['temp']}°C")
-#         if r["alerts"]:
-#             for alert in r["alerts"]:
-#                 print(f"  [告警] {alert}")
+# 取消注释运行（需要本地有 vLLM/SGLang 服务）
+# check_model_service("http://localhost:8000")
 
 # --------------------------------------------------
 # 6. 小练习（先自己写，写不出再看下面的参考答案）
 # --------------------------------------------------
 
-# 练习1：多机命令执行器
-# 给定服务器列表和命令，批量执行并返回每台的结果
+# 练习1：调本地 API 获取模型列表
+# 用 requests.get() 调 http://localhost:8000/v1/models
+# 打印所有模型 ID
+# 提示：response.json()["data"] 里有模型列表
 
 # ====== 在这里写你的代码 ======
 
 
 
 
-# 练习2：并发 GPU 巡检
-# 用 ThreadPoolExecutor 并发检查多台 GPU 服务器，汇总结果
+# 练习2：发送一个聊天请求
+# 用 requests.post() 调 http://localhost:8000/v1/chat/completions
+# 发送 "你好" 消息，打印模型回复
+# 提示：请求体需要 model 和 messages 字段
 
 # ====== 在这里写你的代码 ======
 
 
 
 
-# 练习3：生成巡检报告
-# 将多机巡检结果写入文件，格式化输出
+# 练习3：批量检查多个服务状态
+# 给定服务列表，逐个检查 /health，输出每个服务状态
+# urls = ["http://gpu-01:8000", "http://gpu-02:8000", "http://gpu-03:8000"]
 
 # ====== 在这里写你的代码 ======
 
@@ -230,73 +180,51 @@ def batch_gpu_check(servers, max_workers=5):
 # --------------------------------------------------
 # 练习1 参考答案（先自己写！）
 # --------------------------------------------------
-# import paramiko
+# import requests
 #
-# def batch_exec(servers, command):
-#     results = {}
-#     for srv in servers:
-#         client = paramiko.SSHClient()
-#         client.set_missing_host_key_policy(paramiko.AutoAddPolicy())
-#         try:
-#             client.connect(srv["host"], username=srv.get("username", "root"),
-#                          key_filename="~/.ssh/id_rsa", timeout=10)
-#             stdin, stdout, stderr = client.exec_command(command)
-#             results[srv["host"]] = stdout.read().decode("utf-8").strip()
-#         except Exception as e:
-#             results[srv["host"]] = f"失败: {e}"
-#         finally:
-#             client.close()
-#     return results
+# try:
+#     resp = requests.get("http://localhost:8000/v1/models", timeout=5)
+#     data = resp.json()
+#     print("已加载的模型:")
+#     for m in data["data"]:
+#         print(f"  - {m['id']}")
+# except requests.exceptions.ConnectionError:
+#     print("无法连接服务，请确认 vLLM/SGLang 是否启动")
 
 # --------------------------------------------------
 # 练习2 参考答案（先自己写！）
 # --------------------------------------------------
-# import paramiko
-# from concurrent.futures import ThreadPoolExecutor, as_completed
+# import requests
 #
-# servers = [
-#     {"host": "gpu-01", "username": "root"},
-#     {"host": "gpu-02", "username": "root"},
-#     {"host": "gpu-03", "username": "root"},
-# ]
+# url = "http://localhost:8000/v1/chat/completions"
+# data = {
+#     "model": "qwen",
+#     "messages": [
+#         {"role": "user", "content": "你好"}
+#     ]
+# }
 #
-# def check_gpu(srv):
-#     client = paramiko.SSHClient()
-#     client.set_missing_host_key_policy(paramiko.AutoAddPolicy())
-#     try:
-#         client.connect(srv["host"], username=srv["username"],
-#                      key_filename="~/.ssh/id_rsa", timeout=10)
-#         stdin, stdout, stderr = client.exec_command(
-#             "nvidia-smi --query-gpu=utilization.gpu,temperature.gpu --format=csv,noheader,nounits"
-#         )
-#         return srv["host"], stdout.read().decode("utf-8").strip()
-#     except Exception as e:
-#         return srv["host"], f"失败: {e}"
-#     finally:
-#         client.close()
-#
-# with ThreadPoolExecutor(max_workers=3) as pool:
-#     futures = [pool.submit(check_gpu, srv) for srv in servers]
-#     for future in as_completed(futures):
-#         host, output = future.result()
-#         print(f"{host}: {output}")
+# try:
+#     resp = requests.post(url, json=data, timeout=30)
+#     result = resp.json()
+#     content = result["choices"][0]["message"]["content"]
+#     print(f"模型回复: {content}")
+# except requests.exceptions.ConnectionError:
+#     print("无法连接服务")
 
 # --------------------------------------------------
 # 练习3 参考答案（先自己写！）
 # --------------------------------------------------
-# def generate_report(results, output_file="gpu_report.txt"):
-#     from datetime import datetime
-#     with open(output_file, "w") as f:
-#         f.write(f"GPU 巡检报告 - {datetime.now().strftime('%Y-%m-%d %H:%M')}\n")
-#         f.write("=" * 50 + "\n")
-#         for host, info in results.items():
-#             f.write(f"\n{host}:\n")
-#             if info.get("success"):
-#                 for gpu in info.get("gpus", []):
-#                     f.write(f"  GPU {gpu['index']}: 利用率 {gpu['util']}%, "
-#                            f"温度 {gpu['temp']}°C\n")
-#                 for alert in info.get("alerts", []):
-#                     f.write(f"  [告警] {alert}\n")
-#             else:
-#                 f.write(f"  检查失败: {info.get('error', '未知')}\n")
-#     print(f"报告已写入: {output_file}")
+# import requests
+#
+# urls = ["http://gpu-01:8000", "http://gpu-02:8000", "http://gpu-03:8000"]
+#
+# for url in urls:
+#     try:
+#         resp = requests.get(f"{url}/health", timeout=3)
+#         status = "正常" if resp.status_code == 200 else f"异常({resp.status_code})"
+#         print(f"{url}: {status}")
+#     except requests.exceptions.ConnectionError:
+#         print(f"{url}: 无法连接")
+#     except requests.exceptions.Timeout:
+#         print(f"{url}: 响应超时")

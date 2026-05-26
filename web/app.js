@@ -849,7 +849,153 @@ new_config = {"model": "qwen-72b", "port": 8080, "timeout": 30}`
     ]
   },
   {
-    id: 5, title: "if/else 条件判断", icon: "D5",
+    id: 5, title: "JSON 处理", icon: "D5",
+    tag: "基础", tagClass: "green",
+    desc: "掌握 JSON 格式的读写和解析，这是 API 交互的基础",
+    sections: [
+      {
+        title: "JSON 是什么",
+        content: `<div class="text-block">JSON (JavaScript Object Notation) 是最通用的数据交换格式，几乎所有 API 都用 JSON 传输数据。Python 通过 <code>json</code> 模块处理 JSON。</div>
+<div class="table-wrap"><table><tr><th>Python 类型</th><th>JSON 类型</th><th>示例</th></tr>
+<tr><td>dict</td><td>object</td><td>{"key": "value"}</td></tr>
+<tr><td>list</td><td>array</td><td>[1, 2, 3]</td></tr>
+<tr><td>str</td><td>string</td><td>"hello"</td></tr>
+<tr><td>int/float</td><td>number</td><td>42, 3.14</td></tr>
+<tr><td>True/False</td><td>true/false</td><td>true</td></tr>
+<tr><td>None</td><td>null</td><td>null</td></tr></table></div>` },
+      {
+        title: "json.loads / json.dumps",
+        content: `<div class="text-block"><code>json.loads()</code> 把 JSON 字符串 → Python 对象；<code>json.dumps()</code> 把 Python 对象 → JSON 字符串。</div>
+<div class="code-block"><div class="code-header"><span class="lang-label">python</span><button class="copy-btn" onclick="copyCode(this)">Copy</button></div><pre><code class="language-python">import json
+
+# JSON 字符串 → Python 字典
+json_str = '{"model": "qwen-72b", "port": 8000, "gpu": 4}'
+config = json.loads(json_str)
+print(config["model"])   # qwen-72b
+print(config["port"])    # 8000
+
+# Python 字典 → JSON 字符串
+data = {"status": "running", "temperature": 72}
+json_str = json.dumps(data, ensure_ascii=False, indent=2)
+print(json_str)</code></pre></div>
+<div class="tip-block"><strong>提示：</strong><code>ensure_ascii=False</code> 让中文正常显示，<code>indent=2</code> 让输出更美观。</div>` },
+      {
+        title: "读写 JSON 文件",
+        content: `<div class="text-block">用 <code>json.load()</code> 和 <code>json.dump()</code> 配合 <code>with open()</code> 读写文件。</div>
+<div class="code-block"><div class="code-header"><span class="lang-label">python</span><button class="copy-btn" onclick="copyCode(this)">Copy</button></div><pre><code class="language-python">import json
+
+# 写入 JSON 文件
+config = {
+    "model": "qwen-72b",
+    "port": 8000,
+    "gpu_devices": [0, 1, 2, 3]
+}
+with open("config.json", "w") as f:
+    json.dump(config, f, indent=2, ensure_ascii=False)
+
+# 读取 JSON 文件
+with open("config.json") as f:
+    loaded = json.load(f)
+    print(loaded["model"])       # qwen-72b
+    print(loaded["gpu_devices"]) # [0, 1, 2, 3]</code></pre></div>` },
+      {
+        title: "嵌套 JSON 解析",
+        content: `<div class="text-block">API 返回的 JSON 通常有多层嵌套，需要逐层取值。</div>
+<div class="code-block"><div class="code-header"><span class="lang-label">python</span><button class="copy-btn" onclick="copyCode(this)">Copy</button></div><pre><code class="language-python">import json
+
+# 模拟 vLLM API 返回的模型信息
+response = '''
+{
+    "object": "list",
+    "data": [
+        {"id": "qwen-72b", "owned_by": "ops-team", "max_tokens": 8192},
+        {"id": "qwen-7b", "owned_by": "ops-team", "max_tokens": 4096}
+    ]
+}
+'''
+
+result = json.loads(response)
+
+# 逐层取值
+models = result["data"]
+for model in models:
+    print(f"模型: {model['id']}, 最大token: {model['max_tokens']}")
+
+# 提取所有模型 ID
+model_ids = [m["id"] for m in models]
+print(model_ids)  # ['qwen-72b', 'qwen-7b']</code></pre></div>` },
+      {
+        title: "实战：解析 nvidia-smi 输出",
+        content: `<div class="code-block"><div class="code-header"><span class="lang-label">python</span><button class="copy-btn" onclick="copyCode(this)">Copy</button></div><pre><code class="language-python">import json
+
+# 模拟 nvidia-smi --query-gpu 的 JSON 输出
+gpu_data = '''
+{
+    "gpus": [
+        {"id": 0, "name": "A100", "temp": 78, "memory_used": "40GB", "memory_total": "80GB"},
+        {"id": 1, "name": "A100", "temp": 82, "memory_used": "65GB", "memory_total": "80GB"},
+        {"id": 2, "name": "A100", "temp": 45, "memory_used": "10GB", "memory_total": "80GB"},
+        {"id": 3, "name": "A100", "temp": 91, "memory_used": "72GB", "memory_total": "80GB"}
+    ]
+}
+'''
+
+data = json.loads(gpu_data)
+
+# 找出温度超过 85°C 的 GPU
+hot_gpus = [g for g in data["gpus"] if g["temp"] > 85]
+for gpu in hot_gpus:
+    print(f"⚠️ GPU {gpu['id']} 温度过高: {gpu['temp']}°C")
+
+# 计算平均显存使用率
+for gpu in data["gpus"]:
+    used = int(gpu["memory_used"].replace("GB", ""))
+    total = int(gpu["memory_total"].replace("GB", ""))
+    pct = used / total * 100
+    print(f"GPU {gpu['id']}: {pct:.1f}%")</code></pre></div>` }
+    ],
+    exercises: [
+      { title: "解析模型列表", desc: `给定 JSON 字符串，提取所有模型名称。<br>提示：先 loads 成字典，再遍历 data 列表`, answer: `import json
+json_str = '{"data": [{"id": "qwen-72b"}, {"id": "llama-3"}, {"id": "deepseek"}]}'
+data = json.loads(json_str)
+names = [m["id"] for m in data["data"]]
+print(names)`, starter: `import json
+
+json_str = '{"data": [{"id": "qwen-72b"}, {"id": "llama-3"}, {"id": "deepseek"}]}'
+# 提取所有模型名称
+` },
+      { title: "读写配置文件", desc: `写一个程序：把字典写入 config.json，再读回来打印。<br>提示：json.dump 写入，json.load 读取`, answer: `import json
+
+config = {"model": "qwen-72b", "port": 8000, "gpus": [0, 1]}
+with open("config.json", "w") as f:
+    json.dump(config, f, indent=2)
+
+with open("config.json") as f:
+    loaded = json.load(f)
+    print(loaded["model"])
+    print(loaded["gpus"])`, starter: `import json
+
+config = {"model": "qwen-72b", "port": 8000, "gpus": [0, 1]}
+# 写入 config.json
+
+# 读回来并打印
+` },
+      { title: "解析嵌套监控数据", desc: `给定嵌套 JSON，找出 CPU 使用率超过 80% 的服务器。<br>提示：遍历 servers 列表，检查 cpu_usage 字段`, answer: `import json
+
+data = json.loads('{"servers": [{"name": "gpu-01", "cpu": 85, "mem": 70}, {"name": "gpu-02", "cpu": 45, "mem": 90}, {"name": "gpu-03", "cpu": 92, "mem": 60}]}')
+
+busy = [s for s in data["servers"] if s["cpu"] > 80]
+for s in busy:
+    print(f"{s['name']}: CPU {s['cpu']}%")`, starter: `import json
+
+data = json.loads('{"servers": [{"name": "gpu-01", "cpu": 85, "mem": 70}, {"name": "gpu-02", "cpu": 45, "mem": 90}, {"name": "gpu-03", "cpu": 92, "mem": 60}]}')
+
+# 找出 CPU > 80% 的服务器
+` }
+    ]
+  },
+  {
+    id: 6, title: "if/else 条件判断", icon: "D6",
     tag: "核心", tagClass: "blue",
     desc: "能让程序根据不同条件做不同的事",
     sections: [
@@ -1085,7 +1231,7 @@ gpu_usage = 92`
     ]
   },
 {
-    id: 6, title: "for/while 循环", icon: "D6",
+    id: 7, title: "for/while 循环", icon: "D7",
     tag: "核心", tagClass: "blue",
     desc: "能批量处理服务器、日志、配置等重复性任务",
     sections: [
@@ -1314,7 +1460,7 @@ else:
     ]
   },
   {
-    id: 7, title: "函数 (def)", icon: "D7",
+    id: 8, title: "函数 (def)", icon: "D8",
     tag: "核心", tagClass: "blue",
     desc: "能把重复代码封装成函数，提高复用性",
     sections: [
@@ -1533,7 +1679,7 @@ print(count_logs(test_logs))`
     ]
   },
   {
-    id: 8, title: "文件读写", icon: "D8",
+    id: 9, title: "文件读写", icon: "D9",
     tag: "核心", tagClass: "amber",
     desc: "能读取日志文件、写入配置、处理 CSV/TXT",
     sections: [
@@ -1750,8 +1896,8 @@ filter_logs("service.log", "output/errors.log", "ERROR")`
     ]
   },
   {
-    id: 9, title: "异常处理 (try/except)", icon: "D9",
-    tag: "进阶", tagClass: "amber",
+    id: 10, title: "异常处理 (try/except)", icon: "D10",
+    tag: "核心", tagClass: "blue",
     desc: "让脚本遇到错误不崩溃，能优雅处理",
     sections: [
       {
@@ -2019,7 +2165,7 @@ print(safe_get(data, ["a", "x", "y"]))` },
     ]
   },
   {
-    id: 10, title: "模块和 import", icon: "D10",
+    id: 11, title: "模块和 import", icon: "D11",
     tag: "进阶", tagClass: "amber",
     desc: "能用标准库和第三方库，能组织自己的代码",
     sections: [
@@ -2272,7 +2418,499 @@ for f in find_log_files("."):
     ]
   },
   {
-    id: 11, title: "requests 基础", icon: "D11",
+    id: 12, title: "class 基础认识", icon: "D12",
+    tag: "进阶", tagClass: "amber",
+    desc: "理解 Python 类的基本用法，能看懂别人写的类",
+    sections: [
+      {
+        title: "什么是类",
+        content: `<div class="text-block">类 (class) 就像一个<strong>模板/蓝图</strong>，用来创建具有相同属性和方法的对象。你不需要精通面向对象编程，只需要能<strong>看懂和简单使用</strong>即可。</div>
+<div class="code-block"><div class="code-header"><span class="lang-label">python</span><button class="copy-btn" onclick="copyCode(this)">Copy</button></div><pre><code class="language-python"># 简单理解：类 = 模板，对象 = 从模板造出来的东西
+class Dog:
+    def __init__(self, name):
+        self.name = name
+
+    def bark(self):
+        print(f"{self.name}: 汪汪!")
+
+# 用模板创建对象
+dog1 = Dog("旺财")
+dog1.bark()  # 旺财: 汪汪!</code></pre></div>` },
+      {
+        title: "__init__ 和 self",
+        content: `<div class="text-block"><code>__init__</code> 是初始化方法（构造函数），创建对象时自动调用。<code>self</code> 代表对象自身。</div>
+<div class="code-block"><div class="code-header"><span class="lang-label">python</span><button class="copy-btn" onclick="copyCode(this)">Copy</button></div><pre><code class="language-python">class ModelServer:
+    def __init__(self, name, port, gpu_id):
+        # 这些是实例属性
+        self.name = name
+        self.port = port
+        self.gpu_id = gpu_id
+        self.status = "stopped"
+
+    def start(self):
+        self.status = "running"
+        print(f"{self.name} 启动在端口 {self.port}")
+
+    def info(self):
+        return f"{self.name}(GPU:{self.gpu_id}) 状态:{self.status}"
+
+# 创建实例
+server = ModelServer("qwen-72b", 8000, 0)
+server.start()
+print(server.info())</code></pre></div>` },
+      {
+        title: "属性和方法",
+        content: `<div class="text-block"><strong>属性</strong> = 对象的数据（变量）；<strong>方法</strong> = 对象的行为（函数）。</div>
+<div class="code-block"><div class="code-header"><span class="lang-label">python</span><button class="copy-btn" onclick="copyCode(this)">Copy</button></div><pre><code class="language-python">class GPU:
+    def __init__(self, index, name, temp, mem_used, mem_total):
+        self.index = index
+        self.name = name
+        self.temp = temp
+        self.mem_used = mem_used
+        self.mem_total = mem_total
+
+    def mem_percent(self):
+        """方法：计算显存使用率"""
+        return round(self.mem_used / self.mem_total * 100, 1)
+
+    def is_hot(self):
+        """方法：是否温度过高"""
+        return self.temp > 85
+
+gpu = GPU(0, "A100", 78, 40, 80)
+print(f"显存使用: {gpu.mem_percent()}%")
+print(f"温度告警: {gpu.is_hot()}")</code></pre></div>` },
+      {
+        title: "继承（了解即可）",
+        content: `<div class="text-block">继承让子类复用父类的代码。你主要是<strong>能看懂别人写的子类</strong>。</div>
+<div class="code-block"><div class="code-header"><span class="lang-label">python</span><button class="copy-btn" onclick="copyCode(this)">Copy</button></div><pre><code class="language-python">class BaseService:
+    def __init__(self, name, port):
+        self.name = name
+        self.port = port
+
+    def check_health(self):
+        # 基类通用健康检查
+        return {"name": self.name, "port": self.port, "status": "ok"}
+
+# vLLM 继承 BaseService，自动拥有 name/port/check_health
+class VLLMService(BaseService):
+    def __init__(self, name, port, model):
+        super().__init__(name, port)  # 调用父类 __init__
+        self.model = model
+
+    def get_model_info(self):
+        return {"model": self.model, "health": self.check_health()}
+
+vllm = VLLMService("vllm-1", 8000, "qwen-72b")
+print(vllm.get_model_info())</code></pre></div>` }
+    ],
+    exercises: [
+      { title: "定义 GPU 信息类", desc: `创建一个 GPUInfo 类，包含 index、name、temp 属性，以及 is_overheating() 方法。<br>提示：temp > 85 返回 True`, answer: `class GPUInfo:
+    def __init__(self, index, name, temp):
+        self.index = index
+        self.name = name
+        self.temp = temp
+
+    def is_overheating(self):
+        return self.temp > 85
+
+gpu = GPUInfo(0, "A100", 88)
+print(f"GPU {gpu.index} 过热: {gpu.is_overheating()}")`, starter: `class GPUInfo:
+    # __init__: index, name, temp
+    # is_overheating(): temp > 85
+    pass
+
+gpu = GPUInfo(0, "A100", 88)
+print(gpu.is_overheating())
+` },
+      { title: "服务配置类", desc: `创建 ServiceConfig 类，有 name、port、model 属性和 to_dict() 方法。<br>提示：to_dict() 返回 {"name": self.name, ...}`, answer: `class ServiceConfig:
+    def __init__(self, name, port, model):
+        self.name = name
+        self.port = port
+        self.model = model
+
+    def to_dict(self):
+        return {"name": self.name, "port": self.port, "model": self.model}
+
+cfg = ServiceConfig("vllm-api", 8000, "qwen-72b")
+print(cfg.to_dict())`, starter: `class ServiceConfig:
+    # __init__: name, port, model
+    # to_dict(): 返回字典
+    pass
+
+cfg = ServiceConfig("vllm-api", 8000, "qwen-72b")
+print(cfg.to_dict())
+` },
+      { title: "继承扩展示例", desc: `创建 VLLMConfig 继承 ServiceConfig，增加 gpu_count 属性。<br>提示：用 super().__init__() 调用父类`, answer: `class ServiceConfig:
+    def __init__(self, name, port, model):
+        self.name = name
+        self.port = port
+        self.model = model
+
+class VLLMConfig(ServiceConfig):
+    def __init__(self, name, port, model, gpu_count):
+        super().__init__(name, port, model)
+        self.gpu_count = gpu_count
+
+vllm = VLLMConfig("vllm-1", 8000, "qwen-72b", 4)
+print(f"{vllm.name}: {vllm.model} x {vllm.gpu_count} GPU")`, starter: `class ServiceConfig:
+    def __init__(self, name, port, model):
+        self.name = name
+        self.port = port
+        self.model = model
+
+class VLLMConfig(ServiceConfig):
+    # 增加 gpu_count 属性
+    pass
+
+vllm = VLLMConfig("vllm-1", 8000, "qwen-72b", 4)
+print(f"{vllm.name}: {vllm.model} x {vllm.gpu_count} GPU")
+` }
+    ]
+  },
+  {
+    id: 13, title: "装饰器 + async/await", icon: "D13",
+    tag: "进阶", tagClass: "amber",
+    desc: "理解装饰器和异步编程，为 FastAPI 打基础",
+    sections: [
+      {
+        title: "装饰器是什么",
+        content: `<div class="text-block">装饰器就是<strong>给函数"包一层"</strong>，在不修改原函数的情况下增加功能。你先会用即可，不需要深入理解原理。</div>
+<div class="code-block"><div class="code-header"><span class="lang-label">python</span><button class="copy-btn" onclick="copyCode(this)">Copy</button></div><pre><code class="language-python"># @timing 就是装饰器 —— 把下面的函数"包一层"
+# 效果：调用任何函数都自动打印耗时
+
+import time
+
+def timing(func):
+    def wrapper(*args, **kwargs):
+        start = time.time()
+        result = func(*args, **kwargs)
+        elapsed = time.time() - start
+        print(f"{func.__name__} 耗时 {elapsed:.2f}s")
+        return result
+    return wrapper
+
+@timing
+def check_server(name):
+    time.sleep(1)
+    return f"{name} 正常"
+
+result = check_server("gpu-01")
+# 自动输出: check_server 耗时 1.00s</code></pre></div>` },
+      {
+        title: "常见装饰器",
+        content: `<div class="text-block">Python 和第三方库提供了很多现成的装饰器，你只需要<strong>认识它们</strong>。</div>
+<div class="table-wrap"><table><tr><th>装饰器</th><th>来源</th><th>作用</th></tr>
+<tr><td>@property</td><td>Python 内置</td><td>把方法当属性用</td></tr>
+<tr><td>@staticmethod</td><td>Python 内置</td><td>不需要 self 的方法</td></tr>
+<tr><td>@app.get("/")</td><td>FastAPI</td><td>定义 API 路由</td></tr>
+<tr><td>@Field(...)</td><td>Pydantic</td><td>字段验证</td></tr></table></div>
+<div class="code-block"><div class="code-header"><span class="lang-label">python</span><button class="copy-btn" onclick="copyCode(this)">Copy</button></div><pre><code class="language-python">class Server:
+    def __init__(self, name, port):
+        self.name = name
+        self._port = port
+
+    @property
+    def url(self):
+        return f"http://localhost:{self._port}"
+
+s = Server("vllm", 8000)
+print(s.url)  # 像属性一样访问，不需要加 ()</code></pre></div>` },
+      {
+        title: "async/await 基础",
+        content: `<div class="text-block"><code>async def</code> 定义异步函数，<code>await</code> 等待异步操作完成。FastAPI 的接口长这样：<code>@app.get("/") async def ...</code></div>
+<div class="code-block"><div class="code-header"><span class="lang-label">python</span><button class="copy-btn" onclick="copyCode(this)">Copy</button></div><pre><code class="language-python">import asyncio
+
+# async def = 异步函数
+async def check_gpu(gpu_id):
+    print(f"开始检查 GPU {gpu_id}...")
+    await asyncio.sleep(1)  # 模拟耗时操作
+    print(f"GPU {gpu_id} 检查完成")
+    return {"gpu": gpu_id, "temp": 72}
+
+# 运行异步函数
+result = asyncio.run(check_gpu(0))
+print(result)</code></pre></div>
+<div class="tip-block"><strong>为什么学？</strong>FastAPI 用 async 处理并发请求，效率更高。你只需要知道 <code>async def</code> + <code>await</code> 这个模式。</div>` },
+      {
+        title: "asyncio.gather 并发",
+        content: `<div class="text-block"><code>asyncio.gather()</code> 可以<strong>同时</strong>执行多个异步任务，比一个一个等快得多。</div>
+<div class="code-block"><div class="code-header"><span class="lang-label">python</span><button class="copy-btn" onclick="copyCode(this)">Copy</button></div><pre><code class="language-python">import asyncio
+
+async def check_gpu(gpu_id):
+    await asyncio.sleep(1)
+    return f"GPU {gpu_id}: 72°C"
+
+async def check_all():
+    # 同时检查 4 个 GPU（总耗时约 1 秒，而不是 4 秒）
+    results = await asyncio.gather(
+        check_gpu(0),
+        check_gpu(1),
+        check_gpu(2),
+        check_gpu(3),
+    )
+    for r in results:
+        print(r)
+
+asyncio.run(check_all())</code></pre></div>` }
+    ],
+    exercises: [
+      { title: "写一个计时装饰器", desc: `创建 @timer 装饰器，打印被装饰函数的执行时间。<br>提示：用 time.time() 记录开始和结束`, answer: `import time
+
+def timer(func):
+    def wrapper(*args, **kwargs):
+        start = time.time()
+        result = func(*args, **kwargs)
+        print(f"{func.__name__}: {time.time()-start:.3f}s")
+        return result
+    return wrapper
+
+@timer
+def slow_task():
+    time.sleep(0.5)
+    return "done"
+
+slow_task()`, starter: `import time
+
+def timer(func):
+    # 在 func 前后记录时间
+    pass
+
+@timer
+def slow_task():
+    time.sleep(0.5)
+    return "done"
+
+slow_task()
+` },
+      { title: "异步请求函数", desc: `写一个 async def check_server(name) 模拟检查服务器。<br>提示：await asyncio.sleep(1) 模拟网络请求`, answer: `import asyncio
+
+async def check_server(name):
+    await asyncio.sleep(1)
+    return f"{name}: running"
+
+result = asyncio.run(check_server("gpu-01"))
+print(result)`, starter: `import asyncio
+
+async def check_server(name):
+    # 模拟检查
+    pass
+
+result = asyncio.run(check_server("gpu-01"))
+print(result)
+` },
+      { title: "并发检查多台服务器", desc: `用 asyncio.gather 同时检查 3 台服务器。<br>提示：gather(check(0), check(1), check(2))`, answer: `import asyncio
+
+async def check_server(name):
+    await asyncio.sleep(1)
+    return f"{name}: ok"
+
+async def main():
+    results = await asyncio.gather(
+        check_server("gpu-01"),
+        check_server("gpu-02"),
+        check_server("gpu-03"),
+    )
+    for r in results:
+        print(r)
+
+asyncio.run(main())`, starter: `import asyncio
+
+async def check_server(name):
+    await asyncio.sleep(1)
+    return f"{name}: ok"
+
+async def main():
+    # 用 gather 并发检查
+    pass
+
+asyncio.run(main())
+` }
+    ]
+  },
+  {
+    id: 14, title: "Pydantic 数据模型", icon: "D14",
+    tag: "进阶", tagClass: "amber",
+    desc: "用 Pydantic 做数据校验，FastAPI 的核心依赖",
+    sections: [
+      {
+        title: "为什么需要 Pydantic",
+        content: `<div class="text-block">API 接收到的数据可能是错的（类型不对、缺字段、值不合理）。Pydantic 帮你<strong>自动校验和转换</strong>数据，不用手写一堆 if 判断。</div>
+<div class="code-block"><div class="code-header"><span class="lang-label">python</span><button class="copy-btn" onclick="copyCode(this)">Copy</button></div><pre><code class="language-python"># pip install pydantic
+from pydantic import BaseModel
+
+class ServerInfo(BaseModel):
+    name: str
+    port: int
+    status: str = "running"  # 默认值
+
+# 自动类型转换："8000" 字符串 → 8000 整数
+server = ServerInfo(name="vllm-1", port="8000")
+print(server.port)        # 8000 (int)
+print(server.status)      # "running" (默认值)
+
+# 校验失败会报错
+# bad = ServerInfo(name=123, port="abc")  # ValidationError!</code></pre></div>` },
+      {
+        title: "Field 验证器",
+        content: `<div class="text-block"><code>Field()</code> 可以添加更详细的校验规则。</div>
+<div class="code-block"><div class="code-header"><span class="lang-label">python</span><button class="copy-btn" onclick="copyCode(this)">Copy</button></div><pre><code class="language-python">from pydantic import BaseModel, Field
+
+class ChatRequest(BaseModel):
+    question: str = Field(min_length=1, description="用户问题")
+    model: str = Field(default="qwen-72b", description="模型名称")
+    temperature: float = Field(default=0.7, ge=0, le=2, description="温度参数")
+    max_tokens: int = Field(default=2048, ge=1, le=8192)
+
+# 正常使用
+req = ChatRequest(question="什么是RAG？")
+print(req.question)      # 什么是RAG？
+print(req.temperature)   # 0.7
+
+# 温度超范围会报错
+# bad = ChatRequest(question="test", temperature=3.0)  # Error!</code></pre></div>` },
+      {
+        title: "嵌套模型",
+        content: `<div class="text-block">模型可以嵌套其他模型，构建复杂的数据结构。</div>
+<div class="code-block"><div class="code-header"><span class="lang-label">python</span><button class="copy-btn" onclick="copyCode(this)">Copy</button></div><pre><code class="language-python">from pydantic import BaseModel
+from typing import List
+
+class GPUInfo(BaseModel):
+    index: int
+    name: str
+    temperature: int
+    memory_gb: float
+
+class ServerStatus(BaseModel):
+    hostname: str
+    gpus: List[GPUInfo]
+    status: str = "online"
+
+# 使用嵌套模型
+server = ServerStatus(
+    hostname="gpu-server-01",
+    gpus=[
+        GPUInfo(index=0, name="A100", temperature=78, memory_gb=40.0),
+        GPUInfo(index=1, name="A100", temperature=82, memory_gb=65.0),
+    ]
+)
+
+print(server.hostname)
+for gpu in server.gpus:
+    print(f"GPU {gpu.index}: {gpu.temperature}°C")</code></pre></div>` },
+      {
+        title: "实际场景：定义请求响应",
+        content: `<div class="code-block"><div class="code-header"><span class="lang-label">python</span><button class="copy-btn" onclick="copyCode(this)">Copy</button></div><pre><code class="language-python">from pydantic import BaseModel, Field
+from typing import List, Optional
+
+class ChatRequest(BaseModel):
+    """聊天请求 — 用户发给 API 的数据"""
+    question: str = Field(min_length=1, max_length=2000)
+    model: str = "qwen-72b"
+    temperature: float = Field(default=0.7, ge=0, le=2)
+    stream: bool = False
+
+class SourceDoc(BaseModel):
+    """检索到的参考文档"""
+    content: str
+    score: float
+
+class ChatResponse(BaseModel):
+    """聊天响应 — API 返回的数据"""
+    answer: str
+    sources: List[SourceDoc] = []
+    model: str
+    usage_tokens: Optional[int] = None
+
+# 模拟一次对话
+req = ChatRequest(question="GPU温度过高怎么办？")
+resp = ChatResponse(
+    answer="检查散热和风扇...",
+    sources=[SourceDoc(content="GPU告警阈值85°C", score=0.95)],
+    model="qwen-72b",
+    usage_tokens=150
+)
+print(resp.model_dump_json(indent=2))</code></pre></div>` }
+    ],
+    exercises: [
+      { title: "定义服务器信息模型", desc: `创建 ServerInfo 模型：name(str), port(int, 1-65535), status(str, 默认"online")。<br>提示：用 Field(ge=1, le=65535) 约束端口范围`, answer: `from pydantic import BaseModel, Field
+
+class ServerInfo(BaseModel):
+    name: str
+    port: int = Field(ge=1, le=65535)
+    status: str = "online"
+
+s = ServerInfo(name="vllm", port=8000)
+print(s.name, s.port, s.status)`, starter: `from pydantic import BaseModel, Field
+
+class ServerInfo:
+    # name: str
+    # port: int (1-65535)
+    # status: str (默认 "online")
+    pass
+
+s = ServerInfo(name="vllm", port=8000)
+print(s.name, s.port, s.status)
+` },
+      { title: "定义 API 请求响应模型", desc: `创建 AskRequest(question, top_k=3) 和 AskResponse(answer, sources)。<br>提示：top_k 用 Field(ge=1, le=10)`, answer: `from pydantic import BaseModel, Field
+from typing import List
+
+class AskRequest(BaseModel):
+    question: str = Field(min_length=1)
+    top_k: int = Field(default=3, ge=1, le=10)
+
+class AskResponse(BaseModel):
+    answer: str
+    sources: List[str]
+
+req = AskRequest(question="GPU温度")
+resp = AskResponse(answer="检查散热", sources=["doc1", "doc2"])
+print(req.question, resp.answer)`, starter: `from pydantic import BaseModel, Field
+from typing import List
+
+class AskRequest:
+    # question: str
+    # top_k: int (默认3, 1-10)
+    pass
+
+class AskResponse:
+    # answer: str
+    # sources: List[str]
+    pass
+` },
+      { title: "嵌套模型（GPU+服务器）", desc: `创建 GPU(gpu_id, temp, mem_pct) 嵌套在 Server(name, gpus列表) 中。<br>提示：Server 的 gpus 字段类型是 List[GPU]`, answer: `from pydantic import BaseModel
+from typing import List
+
+class GPU(BaseModel):
+    gpu_id: int
+    temp: int
+    mem_pct: float
+
+class Server(BaseModel):
+    name: str
+    gpus: List[GPU]
+
+s = Server(name="gpu-01", gpus=[
+    GPU(gpu_id=0, temp=78, mem_pct=50.0),
+    GPU(gpu_id=1, temp=82, mem_pct=80.0),
+])
+print(s.name)
+for g in s.gpus:
+    print(f"  GPU {g.gpu_id}: {g.temp}°C")`, starter: `from pydantic import BaseModel
+from typing import List
+
+class GPU:
+    # gpu_id, temp, mem_pct
+    pass
+
+class Server:
+    # name, gpus (GPU 列表)
+    pass
+` }
+    ]
+  },
+  {
+    id: 15, title: "requests 基础", icon: "D15",
     tag: "实战", tagClass: "blue",
     desc: "会用 requests 调本地大模型 API，处理 JSON 响应",
     sections: [
@@ -2398,7 +3036,7 @@ for url in urls:
     ]
   },
   {
-    id: 12, title: "requests 进阶", icon: "D12",
+    id: 16, title: "requests 进阶", icon: "D16",
     tag: "实战", tagClass: "blue",
     desc: "写生产级请求代码：超时、重试、错误处理、流式响应",
     sections: [
@@ -2538,7 +3176,7 @@ data = {
     ]
   },
   {
-    id: 13, title: "subprocess — 系统命令", icon: "D13",
+    id: 17, title: "subprocess — 系统命令", icon: "D17",
     tag: "实战", tagClass: "blue",
     desc: "在 Python 里执行 nvidia-smi、docker 等运维命令",
     sections: [
@@ -2680,887 +3318,705 @@ def check_containers():
     ]
   },
   {
-    id: 14, title: "paramiko 基础 — SSH", icon: "D14",
-    tag: "实战", tagClass: "blue",
-    desc: "用 Python SSH 到远程服务器执行命令、传输文件",
+    id: 18, title: "FastAPI 入门", icon: "D18",
+    tag: "框架", tagClass: "blue",
+    desc: "能跑起来 FastAPI 服务，理解路由和请求处理",
     sections: [
       {
-        title: "安装和连接",
-        content: `<div class="text-block"><code>paramiko</code> 是 Python 的 SSH 库。连远程服务器、执行命令、传文件都能搞定。</div>
-<div class="code-block"><div class="code-header"><span class="lang-label">python</span><button class="copy-btn" onclick="copyCode(this)">Copy</button></div><pre><code class="language-python">import paramiko
+        title: "Hello FastAPI",
+        content: `<div class="text-block"><code>FastAPI</code> 是 Python 最快的 Web 框架。几行代码就能启动一个 API 服务。</div>
+<div class="code-block"><div class="code-header"><span class="lang-label">python</span><button class="copy-btn" onclick="copyCode(this)">Copy</button></div><pre><code class="language-python">from fastapi import FastAPI
+import uvicorn
 
-client = paramiko.SSHClient()
-client.set_missing_host_key_policy(paramiko.AutoAddPolicy())
+app = FastAPI()
 
-# 密码连接
-client.connect("gpu-01", username="root", password="xxx", timeout=10)
+@app.get("/")
+def root():
+    return {"message": "Hello FastAPI!"}
 
-# 或密钥连接（推荐）
-client.connect("gpu-01", username="root", key_filename="~/.ssh/id_rsa")
+@app.get("/health")
+def health():
+    return {"status": "ok"}
 
-# 用完关闭
-client.close()</code></pre></div>` },
+# 启动: uvicorn main:app --reload --port 8000</code></pre></div>
+<div class="tip-box info"><p>启动后访问 <code>http://localhost:8000/docs</code> 可以看到自动生成的 API 文档。</p></div>` },
       {
-        title: "执行远程命令",
-        content: `<div class="code-block"><div class="code-header"><span class="lang-label">python</span><button class="copy-btn" onclick="copyCode(this)">Copy</button></div><pre><code class="language-python">stdin, stdout, stderr = client.exec_command("nvidia-smi")
-output = stdout.read().decode("utf-8")
-error = stderr.read().decode("utf-8")
-exit_code = stdout.channel.recv_exit_status()
+        title: "路由和路径参数",
+        content: `<div class="code-block"><div class="code-header"><span class="lang-label">python</span><button class="copy-btn" onclick="copyCode(this)">Copy</button></div><pre><code class="language-python">@app.get("/models")
+def list_models():
+    return {"models": ["qwen-72b", "llama-70b"]}
 
-print(f"输出: {output}")
-print(f"退出码: {exit_code}")</code></pre></div>` },
+@app.get("/gpu/{server_name}")
+def gpu_info(server_name: str):
+    return {"server": server_name, "status": "running"}
+
+@app.get("/search")
+def search(q: str = "", limit: int = 10):
+    return {"query": q, "limit": limit}</code></pre></div>` },
       {
-        title: "文件传输 (SFTP)",
-        content: `<div class="code-block"><div class="code-header"><span class="lang-label">python</span><button class="copy-btn" onclick="copyCode(this)">Copy</button></div><pre><code class="language-python">sftp = client.open_sftp()
+        title: "POST 请求体",
+        content: `<div class="text-block">用 Pydantic 定义请求体，FastAPI 自动校验。</div>
+<div class="code-block"><div class="code-header"><span class="lang-label">python</span><button class="copy-btn" onclick="copyCode(this)">Copy</button></div><pre><code class="language-python">from pydantic import BaseModel
 
-# 上传
-sftp.put("local_config.yaml", "/etc/vllm/config.yaml")
+class ChatRequest(BaseModel):
+    question: str
+    model: str = "qwen"
 
-# 下载
-sftp.get("/var/log/vllm.log", "vllm.log")
-
-sftp.close()</code></pre></div>` },
-      {
-        title: "实战：远程 GPU 检查",
-        content: `<div class="code-block"><div class="code-header"><span class="lang-label">python</span><button class="copy-btn" onclick="copyCode(this)">Copy</button></div><pre><code class="language-python">def check_remote_gpu(host, key_file="~/.ssh/id_rsa"):
-    client = paramiko.SSHClient()
-    client.set_missing_host_key_policy(paramiko.AutoAddPolicy())
-    try:
-        client.connect(host, username="root",
-                       key_filename=key_file, timeout=10)
-        stdin, stdout, stderr = client.exec_command(
-            "nvidia-smi --query-gpu=index,temperature.gpu --format=csv,noheader"
-        )
-        print(f"{host}: {stdout.read().decode().strip()}")
-    finally:
-        client.close()</code></pre></div>` }
+@app.post("/chat")
+def chat(req: ChatRequest):
+    return {"answer": f"回复: {req.question}"}</code></pre></div>` }
     ],
     exercises: [
-      { title: "封装 SSH 执行函数", desc: `写 ssh_exec(host, cmd, username="root", key_file=None)<br>返回命令输出字符串`, answer: `import paramiko
-
-def ssh_exec(host, cmd, username="root", password=None, key_file=None):
-    client = paramiko.SSHClient()
-    client.set_missing_host_key_policy(paramiko.AutoAddPolicy())
-    try:
-        kwargs = {"hostname": host, "username": username, "timeout": 10}
-        if key_file: kwargs["key_filename"] = key_file
-        elif password: kwargs["password"] = password
-        client.connect(**kwargs)
-        _, stdout, _ = client.exec_command(cmd)
-        return stdout.read().decode("utf-8")
-    except Exception as e:
-        return f"错误: {e}"
-    finally:
-        client.close()`, starter: `import paramiko
-
-def ssh_exec(host, cmd, username="root", password=None, key_file=None):
-    # 创建 SSH 客户端
-    # 连接服务器
-    # 执行命令
-    # 返回输出
-    pass
+      { title: "返回服务器列表的 GET 接口", desc: `GET /servers 返回服务器列表`, answer: `from fastapi import FastAPI
+app = FastAPI()
+@app.get("/servers")
+def list_servers():
+    return [
+        {"name": "gpu-01", "status": "running"},
+        {"name": "gpu-02", "status": "offline"},
+    ]`, starter: `from fastapi import FastAPI
+app = FastAPI()
+# GET /servers 返回服务器列表
 ` },
-      { title: "远程检查服务状态", desc: `SSH 到远程服务器<br>执行 systemctl status vllm<br>判断服务是否运行`, answer: `import paramiko
-
-def check_remote_service(host, service="vllm"):
-    client = paramiko.SSHClient()
-    client.set_missing_host_key_policy(paramiko.AutoAddPolicy())
-    try:
-        client.connect(host, username="root", key_filename="~/.ssh/id_rsa", timeout=10)
-        _, stdout, _ = client.exec_command(f"systemctl is-active {service}")
-        status = stdout.read().decode().strip()
-        print(f"{host}: {service} {'运行中' if status == 'active' else status}")
-    except Exception as e:
-        print(f"{host}: 失败 - {e}")
-    finally:
-        client.close()`, starter: `import paramiko
-
-def check_remote_service(host, service_name="vllm"):
-    # SSH 连接远程服务器
-    # 执行 systemctl status <service_name>
-    # 判断服务状态
-    pass
+      { title: "接收模型名称的 POST 接口", desc: `POST /model/info 接收模型名，返回模拟信息`, answer: `from pydantic import BaseModel
+class ModelReq(BaseModel):
+    model_name: str
+@app.post("/model/info")
+def model_info(req: ModelReq):
+    return {"name": req.model_name, "size": "72B"}`, starter: `from pydantic import BaseModel
+# 定义请求体
+# POST /model/info
 ` },
-      { title: "上传配置文件", desc: `用 SFTP 将本地文件上传到远程服务器`, answer: `import paramiko, os
-
-def upload_config(host, local_path, remote_path):
-    client = paramiko.SSHClient()
-    client.set_missing_host_key_policy(paramiko.AutoAddPolicy())
-    try:
-        client.connect(host, username="root", key_filename="~/.ssh/id_rsa", timeout=10)
-        sftp = client.open_sftp()
-        sftp.put(local_path, remote_path)
-        print(f"上传成功: {local_path} -> {host}:{remote_path}")
-        sftp.close()
-    except FileNotFoundError:
-        print(f"文件不存在: {local_path}")
-    except Exception as e:
-        print(f"失败: {e}")
-    finally:
-        client.close()`, starter: `import paramiko
-import os
-
-def upload_config(host, local_path, remote_path):
-    # SSH 连接
-    # 打开 SFTP
-    # 上传文件
-    pass
+      { title: "健康检查接口", desc: `GET /health 返回服务状态信息`, answer: `@app.get("/health")
+def health():
+    return {"status": "healthy", "version": "1.0"}`, starter: `# GET /health 返回健康状态
 ` }
     ]
   },
   {
-    id: 15, title: "paramiko 批量巡检", icon: "D15",
-    tag: "实战", tagClass: "blue",
-    desc: "并发 SSH 多台服务器，汇总巡检结果",
+    id: 19, title: "FastAPI 请求体", icon: "D19",
+    tag: "框架", tagClass: "blue",
+    desc: "Pydantic + 路径参数 + 查询参数 + 嵌套模型",
     sections: [
       {
-        title: "服务器列表管理",
-        content: `<div class="text-block">用字典列表管理多台服务器，也可以从 JSON 文件读取。</div>
-<div class="code-block"><div class="code-header"><span class="lang-label">python</span><button class="copy-btn" onclick="copyCode(this)">Copy</button></div><pre><code class="language-python">servers = [
-    {"host": "gpu-01", "ip": "10.0.0.1", "username": "root"},
-    {"host": "gpu-02", "ip": "10.0.0.2", "username": "root"},
-    {"host": "gpu-03", "ip": "10.0.0.3", "username": "root"},
-]
+        title: "Pydantic 请求体验证",
+        content: `<div class="code-block"><div class="code-header"><span class="lang-label">python</span><button class="copy-btn" onclick="copyCode(this)">Copy</button></div><pre><code class="language-python">from pydantic import BaseModel, Field
 
-# 从 JSON 文件读取
-# import json
-# with open("servers.json") as f:
-#     servers = json.load(f)["servers"]</code></pre></div>` },
+class CreateServer(BaseModel):
+    name: str = Field(min_length=1)
+    ip: str
+    port: int = Field(ge=1024, le=65535)
+    gpu_count: int = Field(default=4, ge=1)
+
+@app.post("/servers")
+def create(req: CreateServer):
+    return {"created": req.model_dump()}</code></pre></div>` },
       {
-        title: "并发执行（线程池）",
-        content: `<div class="text-block">串行10台要30秒，并发只要3秒。用 <code>ThreadPoolExecutor</code>。</div>
-<div class="code-block"><div class="code-header"><span class="lang-label">python</span><button class="copy-btn" onclick="copyCode(this)">Copy</button></div><pre><code class="language-python">from concurrent.futures import ThreadPoolExecutor, as_completed
+        title: "查询参数验证",
+        content: `<div class="code-block"><div class="code-header"><span class="lang-label">python</span><button class="copy-btn" onclick="copyCode(this)">Copy</button></div><pre><code class="language-python">from fastapi import Query
+from typing import Optional
 
-def check_one(srv, command):
-    client = paramiko.SSHClient()
-    client.set_missing_host_key_policy(paramiko.AutoAddPolicy())
-    try:
-        client.connect(srv["ip"], username=srv["username"],
-                       key_filename="~/.ssh/id_rsa", timeout=10)
-        _, stdout, _ = client.exec_command(command)
-        return srv["host"], stdout.read().decode().strip()
-    except Exception as e:
-        return srv["host"], f"失败: {e}"
-    finally:
-        client.close()
-
-# 并发执行
-with ThreadPoolExecutor(max_workers=5) as pool:
-    futures = [pool.submit(check_one, s, "uptime") for s in servers]
-    for f in as_completed(futures):
-        host, output = f.result()
-        print(f"{host}: {output}")</code></pre></div>` },
-      {
-        title: "结果汇总",
-        content: `<div class="code-block"><div class="code-header"><span class="lang-label">python</span><button class="copy-btn" onclick="copyCode(this)">Copy</button></div><pre><code class="language-python">def format_results(results, title="巡检结果"):
-    print(f"\\n{'='*50}")
-    print(f"  {title}")
-    print(f"{'='*50}")
-    ok = sum(1 for r in results.values() if r["success"])
-    print(f"总数: {len(results)}, 成功: {ok}, 失败: {len(results)-ok}")
-    for host, r in results.items():
-        status = "成功" if r["success"] else "失败"
-        print(f"  {host:<15} [{status}]")</code></pre></div>` }
+@app.get("/servers")
+def list_servers(
+    status: Optional[str] = Query(None),
+    page: int = Query(1, ge=1),
+    size: int = Query(10, ge=1, le=100),
+):
+    return {"status": status, "page": page}</code></pre></div>` }
     ],
     exercises: [
-      { title: "多机命令执行器", desc: `给定服务器列表和命令<br>批量执行并返回每台的结果`, answer: `import paramiko
-
-def batch_exec(servers, command):
-    results = {}
-    for srv in servers:
-        client = paramiko.SSHClient()
-        client.set_missing_host_key_policy(paramiko.AutoAddPolicy())
-        try:
-            client.connect(srv["host"], username=srv.get("username","root"),
-                         key_filename="~/.ssh/id_rsa", timeout=10)
-            _, stdout, _ = client.exec_command(command)
-            results[srv["host"]] = stdout.read().decode().strip()
-        except Exception as e:
-            results[srv["host"]] = f"失败: {e}"
-        finally:
-            client.close()
-    return results`, starter: `import paramiko
-
-def batch_exec(servers, command):
-    # servers = [{"host": "gpu-01", "username": "root"}, ...]
-    # 批量执行 command
-    # 返回 {host: output} 字典
-    pass
+      { title: "定义模型部署请求体", desc: `model_name, port, gpu_ids(List[int]), auto_reload(bool)`, answer: `from pydantic import BaseModel, Field
+from typing import List
+class DeployReq(BaseModel):
+    model_name: str
+    port: int = Field(ge=1024, le=65535)
+    gpu_ids: List[int]
+    auto_reload: bool = False`, starter: `from pydantic import BaseModel, Field
+from typing import List
+# 定义 DeployReq 模型
 ` },
-      { title: "并发 GPU 巡检", desc: `用 ThreadPoolExecutor 并发检查多台 GPU 服务器<br>汇总结果`, answer: `import paramiko
-from concurrent.futures import ThreadPoolExecutor, as_completed
-
-servers = [
-    {"host": "gpu-01", "username": "root"},
-    {"host": "gpu-02", "username": "root"},
-]
-def check_gpu(srv):
-    client = paramiko.SSHClient()
-    client.set_missing_host_key_policy(paramiko.AutoAddPolicy())
-    try:
-        client.connect(srv["host"], username=srv["username"],
-                     key_filename="~/.ssh/id_rsa", timeout=10)
-        _, stdout, _ = client.exec_command(
-            "nvidia-smi --query-gpu=utilization.gpu,temperature.gpu --format=csv,noheader,nounits")
-        return srv["host"], stdout.read().decode().strip()
-    except Exception as e:
-        return srv["host"], f"失败: {e}"
-    finally:
-        client.close()
-
-with ThreadPoolExecutor(max_workers=3) as pool:
-    for f in as_completed([pool.submit(check_gpu, s) for s in servers]):
-        host, out = f.result()
-        print(f"{host}: {out}")`, starter: `import paramiko
-from concurrent.futures import ThreadPoolExecutor, as_completed
-
-servers = [
-    {"host": "gpu-01", "username": "root"},
-    {"host": "gpu-02", "username": "root"},
-    {"host": "gpu-03", "username": "root"},
-]
-
-def check_gpu(host):
-    # SSH 到主机，执行 nvidia-smi，返回 GPU 信息
-    pass
-
-# 用 ThreadPoolExecutor 并发检查
+      { title: "带路径和查询参数的接口", desc: `GET /models/{model_name}/status?verbose=true`, answer: `@app.get("/models/{model_name}/status")
+def model_status(model_name: str, verbose: bool = False):
+    info = {"name": model_name, "status": "running"}
+    if verbose:
+        info["gpu"] = 4
+    return info`, starter: `# GET /models/{model_name}/status?verbose=true
 ` },
-      { title: "生成巡检报告", desc: `将多机巡检结果写入文件<br>格式化输出`, answer: `def generate_report(results, output_file="gpu_report.txt"):
-    from datetime import datetime
-    with open(output_file, "w") as f:
-        f.write(f"GPU 巡检报告 - {datetime.now().strftime('%Y-%m-%d %H:%M')}\\n")
-        f.write("=" * 50 + "\\n")
-        for host, info in results.items():
-            f.write(f"\\n{host}:\\n")
-            if isinstance(info, dict) and info.get("success"):
-                for gpu in info.get("gpus", []):
-                    f.write(f"  GPU {gpu['index']}: {gpu['util']}%, {gpu['temp']}°C\\n")
-            else:
-                f.write(f"  {info}\\n")
-    print(f"报告已写入: {output_file}")`, starter: `def generate_report(results, output_file="gpu_report.txt"):
-    # results = {host: gpu_info_list}
-    # 生成格式化报告
-    # 写入文件
-    pass
+      { title: "嵌套请求体", desc: `ChatRequest 包含 model, messages, config(子模型)`, answer: `class Config(BaseModel):
+    temperature: float = 0.7
+    max_tokens: int = 512
+class ChatReq(BaseModel):
+    model: str
+    messages: list
+    config: Config = Config()`, starter: `# 定义 Config 和 ChatReq 嵌套模型
 ` }
     ]
   },
   {
-    id: 16, title: "docker-py 基础", icon: "D16",
-    tag: "实战", tagClass: "blue",
-    desc: "用 Python 管理 Docker 容器：列出、启动、停止、重启",
+    id: 20, title: "FastAPI 流式输出", icon: "D20",
+    tag: "框架", tagClass: "blue",
+    desc: "StreamingResponse 实现大模型打字机效果",
     sections: [
       {
-        title: "连接 Docker",
-        content: `<div class="code-block"><div class="code-header"><span class="lang-label">python</span><button class="copy-btn" onclick="copyCode(this)">Copy</button></div><pre><code class="language-python">import docker
+        title: "StreamingResponse",
+        content: `<div class="text-block">用 <code>StreamingResponse</code> 逐块返回数据，实现打字机效果。</div>
+<div class="code-block"><div class="code-header"><span class="lang-label">python</span><button class="copy-btn" onclick="copyCode(this)">Copy</button></div><pre><code class="language-python">from fastapi.responses import StreamingResponse
+import asyncio, json
 
-client = docker.from_env()
-client.ping()  # 测试连接
+async def generate(text):
+    for char in text:
+        chunk = {"choices": [{"delta": {"content": char}}]}
+        yield f"data: {json.dumps(chunk, ensure_ascii=False)}\\n\\n"
+        await asyncio.sleep(0.02)
+    yield "data: [DONE]\\n\\n"
 
-# 权限问题？sudo usermod -aG docker $USER</code></pre></div>` },
-      {
-        title: "列出容器",
-        content: `<div class="code-block"><div class="code-header"><span class="lang-label">python</span><button class="copy-btn" onclick="copyCode(this)">Copy</button></div><pre><code class="language-python"># 运行中的容器
-for c in client.containers.list():
-    print(f"{c.name}: {c.status} ({c.image.tags})")
-
-# 所有容器（包括停止的）
-for c in client.containers.list(all=True):
-    print(f"{c.name}: {c.status}")
-
-# 按名称过滤
-vllm = client.containers.list(filters={"name": "vllm"})</code></pre></div>` },
-      {
-        title: "容器生命周期",
-        content: `<div class="code-block"><div class="code-header"><span class="lang-label">python</span><button class="copy-btn" onclick="copyCode(this)">Copy</button></div><pre><code class="language-python">c = client.containers.get("vllm-qwen")
-
-c.start()      # 启动
-c.stop()       # 停止
-c.restart()    # 重启
-c.pause()      # 暂停
-c.unpause()    # 恢复
-
-c.reload()     # 刷新状态
-print(c.status)</code></pre></div>` },
-      {
-        title: "镜像管理",
-        content: `<div class="code-block"><div class="code-header"><span class="lang-label">python</span><button class="copy-btn" onclick="copyCode(this)">Copy</button></div><pre><code class="language-python"># 列出镜像
-for img in client.images.list():
-    size_gb = img.attrs["Size"] / (1024**3)
-    print(f"{img.tags}: {size_gb:.1f} GB")
-
-# 拉取镜像
-client.images.pull("vllm/vllm-openai:latest")</code></pre></div>` }
+@app.post("/chat/stream")
+async def stream_chat(req: ChatRequest):
+    return StreamingResponse(
+        generate("模拟回复"),
+        media_type="text/event-stream"
+    )</code></pre></div>` }
     ],
     exercises: [
-      { title: "列出所有容器及状态", desc: `连接 Docker，列出所有容器<br>打印名称、镜像、状态、端口`, answer: `import docker
-
-def list_containers():
-    client = docker.from_env()
-    for c in client.containers.list(all=True):
-        tags = ", ".join(c.image.tags[:1]) if c.image.tags else "&lt;none&gt;"
-        ports = ", ".join(str(p) for p in c.ports.values()) if c.ports else ""
-        print(f"{c.name:<25} {tags:<30} {c.status:<15} {ports}")`, starter: `import docker
-
-def list_containers():
-    # 连接 Docker
-    # 列出所有容器
-    # 打印信息
-    pass
+      { title: "流式时间接口", desc: `每秒返回当前时间，持续10秒`, answer: `from datetime import datetime
+@app.get("/time/stream")
+async def time_stream():
+    async def gen():
+        for _ in range(10):
+            yield f"data: {datetime.now().strftime('%H:%M:%S')}\\n\\n"
+            await asyncio.sleep(1)
+    return StreamingResponse(gen(), media_type="text/event-stream")`, starter: `# 每秒返回当前时间，持续10秒
 ` },
-      { title: "按名称过滤并重启", desc: `找到名称包含 "vllm" 的容器<br>重启状态异常的`, answer: `import docker
-
-def restart_service_containers(keyword="vllm"):
-    client = docker.from_env()
-    for c in client.containers.list(all=True):
-        if keyword in c.name and c.status != "running":
-            print(f"重启 {c.name} (状态: {c.status})")
-            c.start()
-        elif keyword in c.name:
-            print(f"{c.name} 已在运行")`, starter: `import docker
-
-def restart_service_containers(keyword="vllm"):
-    # 找到名称包含 keyword 的容器
-    # 如果状态不是 running，重启它
-    pass
+      { title: "模拟聊天流式", desc: `逐字返回响应`, answer: `async def slow_answer(text):
+    for word in text.split():
+        yield f"data: {json.dumps({'content': word+' '})}\\n\\n"
+        await asyncio.sleep(0.1)
+    yield "data: [DONE]\\n\\n"`, starter: `# 逐字返回流式响应
 ` },
-      { title: "批量启停服务", desc: `按列表启停指定容器<br>等待状态变化`, answer: `import docker, time
-
-def manage_containers(names, action="start"):
-    client = docker.from_env()
-    for name in names:
-        try:
-            c = client.containers.get(name)
-            getattr(c, action)()
-            time.sleep(2)
-            c.reload()
-            print(f"{action} {name}: {c.status}")
-        except docker.errors.NotFound:
-            print(f"不存在: {name}")`, starter: `import docker
-import time
-
-def manage_containers(names, action="start"):
-    # action 可以是 "start", "stop", "restart"
-    # 按顺序操作每个容器
-    pass
+      { title: "流式日志接口", desc: `逐行返回模拟日志`, answer: `import random
+@app.get("/logs/stream")
+async def log_stream():
+    async def gen():
+        for i in range(20):
+            yield f"data: [{random.choice(['INFO','WARN','ERROR'])}] log {i}\\n\\n"
+            await asyncio.sleep(0.3)
+    return StreamingResponse(gen(), media_type="text/event-stream")`, starter: `# 逐行返回模拟日志
 ` }
     ]
   },
   {
-    id: 17, title: "docker-py 进阶", icon: "D17",
-    tag: "实战", tagClass: "blue",
-    desc: "容器日志分析、资源监控、健康检查、自动重启",
+    id: 21, title: "FastAPI 中间件", icon: "D21",
+    tag: "框架", tagClass: "blue",
+    desc: "CORS 跨域、日志中间件、鉴权、异常处理",
     sections: [
       {
-        title: "容器日志",
-        content: `<div class="code-block"><div class="code-header"><span class="lang-label">python</span><button class="copy-btn" onclick="copyCode(this)">Copy</button></div><pre><code class="language-python">c = client.containers.get("vllm-qwen")
+        title: "CORS 跨域",
+        content: `<div class="text-block">前端调后端会被浏览器拦截，CORS 中间件解决。</div>
+<div class="code-block"><div class="code-header"><span class="lang-label">python</span><button class="copy-btn" onclick="copyCode(this)">Copy</button></div><pre><code class="language-python">from fastapi.middleware.cors import CORSMiddleware
 
-# 最近 50 行
-logs = c.logs(tail=50).decode("utf-8")
-
-# 最近 1 小时
-from datetime import datetime, timedelta
-logs = c.logs(since=datetime.now()-timedelta(hours=1))
-
-# 实时跟踪（docker logs -f）
-for line in c.logs(stream=True, follow=True):
-    print(line.decode().strip())</code></pre></div>` },
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_methods=["*"],
+    allow_headers=["*"],
+)</code></pre></div>` },
       {
-        title: "资源监控",
-        content: `<div class="code-block"><div class="code-header"><span class="lang-label">python</span><button class="copy-btn" onclick="copyCode(this)">Copy</button></div><pre><code class="language-python">stats = container.stats(stream=False)  # 一次快照
+        title: "请求日志和鉴权",
+        content: `<div class="code-block"><div class="code-header"><span class="lang-label">python</span><button class="copy-btn" onclick="copyCode(this)">Copy</button></div><pre><code class="language-python">from fastapi import Request, HTTPException, Depends
 
-# CPU 使用率
-cpu_delta = stats["cpu_stats"]["cpu_usage"]["total_usage"] - \\
-            stats["precpu_stats"]["cpu_usage"]["total_usage"]
-system_delta = stats["cpu_stats"]["system_cpu_usage"] - \\
-               stats["precpu_stats"]["system_cpu_usage"]
-cpu_pct = (cpu_delta / system_delta) * stats["cpu_stats"]["online_cpus"] * 100
+@app.middleware("http")
+async def log_requests(request: Request, call_next):
+    start = time.time()
+    response = await call_next(request)
+    print(f"{request.method} {request.url.path} {response.status_code}")
+    return response
 
-# 内存
-mem_used = stats["memory_stats"]["usage"] / (1024**3)
-mem_limit = stats["memory_stats"]["limit"] / (1024**3)</code></pre></div>` },
-      {
-        title: "自动重启异常容器",
-        content: `<div class="code-block"><div class="code-header"><span class="lang-label">python</span><button class="copy-btn" onclick="copyCode(this)">Copy</button></div><pre><code class="language-python">for c in client.containers.list(filters={"status": "running"}):
-    c.reload()
-    health = c.attrs.get("State", {}).get("Health")
-    if health and health["Status"] == "unhealthy":
-        print(f"[告警] {c.name} 不健康，重启中...")
-        c.restart(timeout=10)</code></pre></div>` }
+async def verify_key(request: Request):
+    auth = request.headers.get("Authorization", "")
+    if not auth.startswith("Bearer "):
+        raise HTTPException(401, "无效密钥")</code></pre></div>` }
     ],
     exercises: [
-      { title: "日志分析函数", desc: `获取容器最近 N 行日志<br>统计 ERROR 出现次数`, answer: `import docker
-
-def analyze_logs(container_name, tail=100):
-    client = docker.from_env()
-    try:
-        c = client.containers.get(container_name)
-        logs = c.logs(tail=tail).decode("utf-8")
-        lines = logs.strip().split("\\n")
-        errors = [l for l in lines if "ERROR" in l.upper()]
-        warnings = [l for l in lines if "WARNING" in l.upper()]
-        print(f"总行数: {len(lines)}")
-        print(f"ERROR: {len(errors)} 次")
-        print(f"WARNING: {len(warnings)} 次")
-    except docker.errors.NotFound:
-        print(f"容器不存在: {container_name}")`, starter: `import docker
-
-def analyze_logs(container_name, tail=100):
-    # 获取容器日志
-    # 统计 ERROR/WARNING 出现次数
-    pass
+      { title: "添加计时中间件", desc: `在响应头加 X-Process-Time`, answer: `@app.middleware("http")
+async def timer(request: Request, call_next):
+    start = time.time()
+    response = await call_next(request)
+    response.headers["X-Process-Time"] = f"{time.time()-start:.3f}s"
+    return response`, starter: `# 在响应头加 X-Process-Time
 ` },
-      { title: "容器资源监控", desc: `获取容器 CPU/内存使用率<br>格式化输出`, answer: `import docker
-
-def get_stats(name):
-    client = docker.from_env()
-    try:
-        c = client.containers.get(name)
-        s = c.stats(stream=False)
-        cpu_d = s["cpu_stats"]["cpu_usage"]["total_usage"] - s["precpu_stats"]["cpu_usage"]["total_usage"]
-        sys_d = s["cpu_stats"]["system_cpu_usage"] - s["precpu_stats"]["system_cpu_usage"]
-        cpu = (cpu_d / sys_d) * s["cpu_stats"]["online_cpus"] * 100 if sys_d > 0 else 0
-        mem = s["memory_stats"]["usage"] / (1024**3)
-        lim = s["memory_stats"]["limit"] / (1024**3)
-        print(f"{name}: CPU {cpu:.1f}%, 内存 {mem:.1f}/{lim:.1f}GB")
-    except Exception as e:
-        print(f"失败: {e}")`, starter: `import docker
-
-def get_container_stats(container_name):
-    # 获取容器 stats
-    # 计算 CPU 使用率
-    # 获取内存使用
-    pass
+      { title: "Token 鉴权", desc: `检查 Authorization: Bearer xxx`, answer: `async def check_token(request: Request):
+    token = request.headers.get("X-Token", "")
+    if token != "my-secret":
+        raise HTTPException(401, "Token无效")`, starter: `# 检查请求头中的 Token
 ` },
-      { title: "自动重启异常容器", desc: `检测 unhealthy 的容器<br>自动重启并记录日志`, answer: `import docker
-from datetime import datetime
-
-def auto_restart_unhealthy():
-    client = docker.from_env()
-    log = []
-    for c in client.containers.list(filters={"status": "running"}):
-        c.reload()
-        h = c.attrs.get("State", {}).get("Health")
-        if h and h["Status"] == "unhealthy":
-            msg = f"[{datetime.now().strftime('%H:%M:%S')}] {c.name} 不健康，重启"
-            log.append(msg)
-            print(msg)
-            c.restart(timeout=10)
-    if log:
-        with open("restart.log", "a") as f:
-            for line in log: f.write(line + "\\n")
-    return log`, starter: `import docker
-import time
-from datetime import datetime
-
-def auto_restart_unhealthy():
-    # 找到所有运行中但 unhealthy 的容器
-    # 重启它们
-    # 记录日志
-    pass
+      { title: "简单限流", desc: `每秒最多 10 个请求`, answer: `from collections import defaultdict
+counts = defaultdict(list)
+@app.middleware("http")
+async def rate_limit(request: Request, call_next):
+    now = time.time()
+    ip = request.client.host
+    counts[ip] = [t for t in counts[ip] if now - t < 1]
+    if len(counts[ip]) >= 10:
+        return JSONResponse(status_code=429, content={"error": "too many"})
+    counts[ip].append(now)
+    return await call_next(request)`, starter: `# 每秒最多 10 个请求
 ` }
     ]
   },
   {
-    id: 18, title: "schedule 定时任务", icon: "D18",
-    tag: "整合", tagClass: "purple",
-    desc: "定时任务框架，整合 requests/subprocess/paramiko",
-    sections: [
-      {
-        title: "schedule 基础",
-        content: `<div class="code-block"><div class="code-header"><span class="lang-label">python</span><button class="copy-btn" onclick="copyCode(this)">Copy</button></div><pre><code class="language-python">import schedule, time
-
-def job():
-    print("执行巡检...")
-
-schedule.every(30).seconds.do(job)      # 每30秒
-schedule.every(5).minutes.do(job)       # 每5分钟
-schedule.every(1).hours.do(job)         # 每1小时
-schedule.every().day.at("09:00").do(job) # 每天9点
-
-while True:
-    schedule.run_pending()
-    time.sleep(1)</code></pre></div>` },
-      {
-        title: "定时健康检查",
-        content: `<div class="code-block"><div class="code-header"><span class="lang-label">python</span><button class="copy-btn" onclick="copyCode(this)">Copy</button></div><pre><code class="language-python">def check_health():
-    try:
-        resp = requests.get("http://localhost:8000/health", timeout=3)
-        status = "正常" if resp.status_code == 200 else "异常"
-    except Exception:
-        status = "无法连接"
-    print(f"[{datetime.now().strftime('%H:%M:%S')}] API: {status}")
-
-schedule.every(30).seconds.do(check_health)</code></pre></div>` },
-      {
-        title: "日志记录",
-        content: `<div class="code-block"><div class="code-header"><span class="lang-label">python</span><button class="copy-btn" onclick="copyCode(this)">Copy</button></div><pre><code class="language-python">import logging
-from logging.handlers import TimedRotatingFileHandler
-
-# 按天滚动日志
-handler = TimedRotatingFileHandler("monitor.log", when="midnight", backupCount=7)
-handler.setFormatter(logging.Formatter("%(asctime)s [%(levelname)s] %(message)s"))
-
-logger = logging.getLogger("monitor")
-logger.addHandler(handler)
-logger.addHandler(logging.StreamHandler())  # 同时打印到屏幕</code></pre></div>` }
-    ],
-    exercises: [
-      { title: "定时 API 健康检查", desc: `每30秒检查一次服务<br>连续检查5次后退出`, answer: `import schedule, time, requests
-
-count = 0
-def check():
-    global count
-    count += 1
-    try:
-        r = requests.get("http://localhost:8000/health", timeout=3)
-        print(f"[{count}] 状态: {r.status_code}")
-    except Exception as e:
-        print(f"[{count}] 异常: {e}")
-    if count >= 5:
-        return schedule.CancelJob
-
-schedule.every(5).seconds.do(check)
-while len(schedule.get_jobs()) > 0:
-    schedule.run_pending()
-    time.sleep(1)
-print("完成")`, starter: `import schedule
-import time
-import requests
-
-def check_health():
-    # 检查服务健康状态
-    pass
-
-# 设置定时任务
-# 运行 5 次后退出
-` },
-      { title: "综合巡检任务", desc: `结合 subprocess + requests<br>定时采集系统和服务信息`, answer: `import schedule, time, subprocess, requests, logging
-
-logging.basicConfig(level=logging.INFO, format="%(asctime)s %(message)s")
-
-def system_check():
-    r = subprocess.run(["uptime"], capture_output=True, text=True)
-    logging.info(f"系统: {r.stdout.strip()}")
-
-def service_check():
-    try:
-        r = requests.get("http://localhost:8000/health", timeout=3)
-        logging.info(f"API: {r.status_code}")
-    except Exception as e:
-        logging.warning(f"API: {e}")
-
-schedule.every(5).seconds.do(service_check)
-schedule.every(10).seconds.do(system_check)
-
-for _ in range(30):
-    schedule.run_pending()
-    time.sleep(1)`, starter: `import schedule
-import time
-import subprocess
-import requests
-import logging
-
-# 配置日志
-
-def system_check():
-    # 用 subprocess 采集系统信息
-    pass
-
-def service_check():
-    # 用 requests 检查服务状态
-    pass
-
-# 设置定时任务
-` },
-      { title: "可配置定时框架", desc: `从配置列表读取任务<br>动态注册 schedule 任务`, answer: `import schedule, time
-
-def check_health(): print("健康检查")
-def check_gpu(): print("GPU检查")
-
-TASKS = [
-    {"name": "health", "interval": 10, "unit": "seconds", "func": check_health},
-    {"name": "gpu", "interval": 1, "unit": "minutes", "func": check_gpu},
-]
-
-for t in TASKS:
-    u = {"seconds": "seconds", "minutes": "minutes", "hours": "hours"}[t["unit"]]
-    getattr(schedule.every(t["interval"]), u).do(t["func"])
-    print(f"注册: {t['name']} 每 {t['interval']} {t['unit']}")
-
-for _ in range(60):
-    schedule.run_pending()
-    time.sleep(1)`, starter: `import schedule
-import time
-
-TASKS_CONFIG = [
-    {"name": "health_check", "interval": 30, "unit": "seconds", "action": "check_health"},
-    {"name": "gpu_monitor", "interval": 5, "unit": "minutes", "action": "check_gpu"},
-]
-
-def load_tasks(config):
-    # 动态注册定时任务
-    pass
-` }
-    ]
-  },
-  {
-    id: 19, title: "告警推送", icon: "D19",
-    tag: "整合", tagClass: "purple",
-    desc: "通过企业微信/钉钉 Webhook 发送告警消息",
-    sections: [
-      {
-        title: "Webhook 基础",
-        content: `<div class="text-block">Webhook = 一个 URL，POST 请求就能发消息。企业微信和钉钉都支持。</div>
-<div class="code-block"><div class="code-header"><span class="lang-label">python</span><button class="copy-btn" onclick="copyCode(this)">Copy</button></div><pre><code class="language-python">import requests
-
-def send_webhook(url, data):
-    resp = requests.post(url, json=data,
-        headers={"Content-Type": "application/json"}, timeout=10)
-    return resp.json()
-
-# 创建步骤：群设置 → 添加机器人 → 获得 URL</code></pre></div>` },
-      {
-        title: "钉钉消息",
-        content: `<div class="code-block"><div class="code-header"><span class="lang-label">python</span><button class="copy-btn" onclick="copyCode(this)">Copy</button></div><pre><code class="language-python">DINGTALK_URL = "https://oapi.dingtalk.com/robot/send?access_token=xxx"
-
-# 文本消息
-requests.post(DINGTALK_URL, json={
-    "msgtype": "text",
-    "text": {"content": "GPU温度告警: gpu-01 92°C"}
-})
-
-# Markdown 消息
-requests.post(DINGTALK_URL, json={
-    "msgtype": "markdown",
-    "markdown": {
-        "title": "GPU告警",
-        "text": "## GPU 温度告警\\n**温度**: 92°C"
-    }
-})</code></pre></div>` },
-      {
-        title: "企业微信消息",
-        content: `<div class="code-block"><div class="code-header"><span class="lang-label">python</span><button class="copy-btn" onclick="copyCode(this)">Copy</button></div><pre><code class="language-python">WECHAT_URL = "https://qyapi.weixin.qq.com/cgi-bin/webhook/send?key=xxx"
-
-# 文本消息
-requests.post(WECHAT_URL, json={
-    "msgtype": "text",
-    "text": {"content": "服务异常: vllm-qwen 已停止"}
-})
-
-# Markdown 消息
-requests.post(WECHAT_URL, json={
-    "msgtype": "markdown",
-    "markdown": {"content": "## 服务告警\\n> vllm-qwen 状态异常"}
-})</code></pre></div>` },
-      {
-        title: "告警冷却机制",
-        content: `<div class="text-block">防止同一告警疯狂刷屏：5分钟内只发一次。</div>
-<div class="code-block"><div class="code-header"><span class="lang-label">python</span><button class="copy-btn" onclick="copyCode(this)">Copy</button></div><pre><code class="language-python">import time
-
-class Alerter:
-    def __init__(self, cooldown=300):  # 5分钟冷却
-        self.cooldown = cooldown
-        self.last_alert = {}
-
-    def send(self, key, message):
-        now = time.time()
-        if key in self.last_alert:
-            if now - self.last_alert[key] < self.cooldown:
-                return False  # 冷却中
-        self.last_alert[key] = now
-        print(f"[发送] {message}")
-        return True</code></pre></div>` }
-    ],
-    exercises: [
-      { title: "发送钉钉文本告警", desc: `封装函数，发送包含服务器名、告警内容的文本消息`, answer: `import requests
-
-def send_dingtalk_alert(url, server, message):
-    data = {
-        "msgtype": "text",
-        "text": {"content": f"[运维告警] {server}: {message}"}
-    }
-    try:
-        resp = requests.post(url, json=data, timeout=10)
-        return resp.json().get("errcode") == 0
-    except Exception as e:
-        print(f"发送失败: {e}")
-        return False`, starter: `import requests
-
-def send_dingtalk_alert(url, server, message):
-    # 构造钉钉文本消息
-    # 发送 POST 请求
-    pass
-` },
-      { title: "GPU 告警 Markdown", desc: `生成 Markdown 格式的 GPU 告警消息`, answer: `from datetime import datetime
-
-def gpu_alert_md(host, gpu_id, temp, threshold=85):
-    now = datetime.now().strftime("%Y-%m-%d %H:%M")
-    return {
-        "msgtype": "markdown",
-        "markdown": {
-            "title": f"GPU告警-{host}",
-            "text": f"## GPU 温度告警\\n> {now}\\n\\n**服务器**: {host}\\n**GPU**: #{gpu_id}\\n**温度**: {temp}°C (阈值: {threshold}°C)"
-        }
-    }`, starter: `from datetime import datetime
-
-def gpu_alert_markdown(host, gpu_id, temp, threshold=85):
-    # 生成 Markdown 格式的告警消息
-    pass
-` },
-      { title: "带冷却的告警器", desc: `同一告警 5 分钟内不重复发送`, answer: `import time
-
-class CooldownAlerter:
-    def __init__(self, cooldown=300):
-        self.cooldown = cooldown
-        self.last_alert = {}
-
-    def send(self, key, message):
-        now = time.time()
-        if key in self.last_alert:
-            if now - self.last_alert[key] < self.cooldown:
-                print(f"[冷却] {key}")
-                return False
-        self.last_alert[key] = now
-        print(f"[发送] {message}")
-        return True
-
-a = CooldownAlerter(300)
-a.send("gpu-01", "温度 92°C")
-a.send("gpu-01", "温度 93°C")  # 冷却中`, starter: `import time
-
-class CooldownAlerter:
-    def __init__(self, cooldown_seconds=300):
-        self.cooldown_seconds = cooldown_seconds
-        self.last_alert = {}
-
-    def send(self, alert_key, message):
-        # 检查冷却
-        # 发送告警
-        pass
-` }
-    ]
-  },
-  {
-    id: 20, title: "最终项目：监控系统", icon: "D20",
-    tag: "项目", tagClass: "red",
-    desc: "整合 Day 11-19，写一个完整的模型服务监控系统",
+    id: 22, title: "FastAPI 实战", icon: "D22",
+    tag: "框架", tagClass: "blue",
+    desc: "写一个完整的模型代理 API 服务",
     sections: [
       {
         title: "项目架构",
-        content: `<div class="text-block">整合 11-19 天所有技能，构建一个<strong>轻量级模型服务监控系统</strong>。</div>
-<div class="table-wrap"><table><tr><th>模块</th><th>技术</th><th>功能</th></tr>
-<tr><td>健康检查</td><td>requests (Day 11-12)</td><td>检查 API 服务状态</td></tr>
-<tr><td>系统监控</td><td>subprocess (Day 13)</td><td>采集 GPU 信息</td></tr>
-<tr><td>远程巡检</td><td>paramiko (Day 14-15)</td><td>SSH 多机巡检</td></tr>
-<tr><td>容器管理</td><td>docker-py (Day 16-17)</td><td>容器状态+自动重启</td></tr>
-<tr><td>定时调度</td><td>schedule (Day 18)</td><td>定时执行巡检</td></tr>
-<tr><td>告警推送</td><td>webhook (Day 19)</td><td>异常通知</td></tr></table></div>` },
+        content: `<div class="text-block">整合 Day 18-21 所学，构建一个完整的模型代理 API 服务。</div>
+<div class="table-wrap"><table><tr><th>功能</th><th>技术</th></tr>
+<tr><td>路由</td><td>FastAPI 路由 + 路径参数</td></tr>
+<tr><td>请求体</td><td>Pydantic 校验</td></tr>
+<tr><td>流式输出</td><td>StreamingResponse</td></tr>
+<tr><td>鉴权</td><td>Bearer Token 中间件</td></tr>
+<tr><td>日志</td><td>请求日志中间件</td></tr></table></div>` },
       {
-        title: "核心代码框架",
-        content: `<div class="code-block"><div class="code-header"><span class="lang-label">python</span><button class="copy-btn" onclick="copyCode(this)">Copy</button></div><pre><code class="language-python">import requests, subprocess, docker, schedule, time, logging
+        title: "核心代码",
+        content: `<div class="code-block"><div class="code-header"><span class="lang-label">python</span><button class="copy-btn" onclick="copyCode(this)">Copy</button></div><pre><code class="language-python">@app.get("/health")
+def health():
+    return {"status": "ok"}
 
-CONFIG = {
-    "services": [
-        {"name": "vllm-qwen", "url": "http://localhost:8000/health"},
-    ],
-    "alert": {"gpu_temp_threshold": 85, "cooldown": 300},
-    "interval": {"health_check": 30, "gpu_check": 60},
-}
+@app.get("/v1/models")
+def list_models(auth=Depends(verify_key)):
+    return {"data": [{"id": "qwen"}]}
 
-def run_full_check():
-    # 1. API 健康检查 (requests)
-    # 2. GPU 状态采集 (subprocess)
-    # 3. 容器状态检查 (docker-py)
-    # 4. 异常告警 (webhook)
-
-schedule.every(30).seconds.do(run_full_check)
-while True:
-    schedule.run_pending()
-    time.sleep(1)</code></pre></div>` },
-      {
-        title: "扩展方向",
-        content: `<div class="text-block">这个监控系统可以持续扩展：</div>
-<div class="tip-box success"><p>
-<strong>Web 界面</strong>：用 Flask 提供状态页面<br>
-<strong>历史数据</strong>：写入 SQLite 保存历史趋势<br>
-<strong>远程巡检</strong>：加入 paramiko 多机检查<br>
-<strong>配置管理</strong>：从 YAML 文件读取配置<br>
-<strong>进程管理</strong>：用 systemd 或 supervisor 守护进程
-</p></div>` }
+@app.post("/v1/chat/completions")
+async def chat(req: ChatRequest, auth=Depends(verify_key)):
+    if req.stream:
+        return StreamingResponse(stream(req), media_type="text/event-stream")
+    return {"answer": "模拟回复"}</code></pre></div>` }
     ],
     exercises: [
-      { title: "添加 SSH 远程巡检", desc: `在监控系统中加入 paramiko 远程巡检功能<br>参考 Day 14-15 的代码`, answer: `import paramiko
-
-def remote_gpu_check(servers):
-    results = {}
-    for srv in servers:
-        client = paramiko.SSHClient()
-        client.set_missing_host_key_policy(paramiko.AutoAddPolicy())
-        try:
-            client.connect(srv["host"], username=srv.get("username","root"),
-                         key_filename="~/.ssh/id_rsa", timeout=10)
-            _, stdout, _ = client.exec_command(
-                "nvidia-smi --query-gpu=temperature.gpu --format=csv,noheader,nounits")
-            temps = stdout.read().decode().strip().split("\\n")
-            results[srv["host"]] = [float(t) for t in temps]
-        except Exception as e:
-            results[srv["host"]] = str(e)
-        finally:
-            client.close()
-    return results`, starter: `import paramiko
-
-def remote_gpu_check(servers):
-    # SSH 到每台服务器
-    # 执行 nvidia-smi
-    # 返回温度数据
-    pass
+      { title: "添加 usage 统计", desc: `GET /stats 返回总请求数和平均延迟`, answer: `req_count = 0
+total_ms = 0
+@app.get("/stats")
+def stats():
+    avg = total_ms / max(req_count, 1)
+    return {"requests": req_count, "avg_ms": avg}`, starter: `# 全局变量统计请求数和延迟
 ` },
-      { title: "添加 Web 状态页面", desc: `用 Flask 提供一个简单的 JSON 状态 API<br>GET /status 返回当前巡检结果`, answer: `from flask import Flask, jsonify
-app = Flask(__name__)
-latest = {}
-
-@app.route("/status")
-def status():
-    return jsonify(latest)
-
-def update_status():
-    global latest
-    latest = {
-        "services": check_api_health(),
-        "gpus": check_gpu_status(),
-        "containers": check_containers(),
-    }
-
-if __name__ == "__main__":
-    import threading
-    threading.Thread(target=lambda: app.run(port=9090), daemon=True).start()
-    while True:
-        update_status()
-        time.sleep(30)`, starter: `# 用 Flask 提供状态页面
-# GET /status 返回巡检结果的 JSON
-pass
+      { title: "请求日志存储", desc: `记录每次请求，提供查询接口`, answer: `logs = []
+@app.middleware("http")
+async def log_store(request: Request, call_next):
+    start = time.time()
+    resp = await call_next(request)
+    logs.append({"path": str(request.url), "ms": (time.time()-start)*1000})
+    return resp
+@app.get("/logs")
+def get_logs():
+    return logs[-100:]`, starter: `# 记录并查询请求日志
 ` },
-      { title: "添加历史数据记录", desc: `把每次巡检结果写入 JSON 文件<br>保留最近 7 天的数据`, answer: `import json, os
-from datetime import datetime
+      { title: "Docker 打包", desc: `写 Dockerfile 打包服务`, answer: `# Dockerfile:
+# FROM python:3.11-slim
+# WORKDIR /app
+# COPY requirements.txt . && pip install -r requirements.txt
+# COPY . .
+# EXPOSE 8000
+# CMD ["uvicorn", "app:app", "--host", "0.0.0.0", "--port", "8000"]`, starter: `# 写 Dockerfile
+` }
+    ]
+  },
+  {
+    id: 23, title: "LangChain 基础", icon: "D23",
+    tag: "RAG", tagClass: "purple",
+    desc: "连接本地大模型，用 PromptTemplate 构建提示词",
+    sections: [
+      {
+        title: "连接本地模型",
+        content: `<div class="code-block"><div class="code-header"><span class="lang-label">python</span><button class="copy-btn" onclick="copyCode(this)">Copy</button></div><pre><code class="language-python">from langchain_openai import ChatOpenAI
 
-def save_history(result, data_dir="history"):
-    os.makedirs(data_dir, exist_ok=True)
-    date_str = datetime.now().strftime("%Y-%m-%d")
-    filepath = os.path.join(data_dir, f"{date_str}.json")
+llm = ChatOpenAI(
+    base_url="http://localhost:8000/v1",
+    api_key="not-needed",
+    model="qwen",
+)
+# response = llm.invoke("GPU温度过高怎么办")</code></pre></div>` },
+      {
+        title: "PromptTemplate",
+        content: `<div class="code-block"><div class="code-header"><span class="lang-label">python</span><button class="copy-btn" onclick="copyCode(this)">Copy</button></div><pre><code class="language-python">from langchain_core.prompts import ChatPromptTemplate
 
-    history = []
-    if os.path.exists(filepath):
-        with open(filepath) as f:
-            history = json.load(f)
+prompt = ChatPromptTemplate.from_messages([
+    ("system", "你是GPU运维专家"),
+    ("user", "{question}")
+])
 
-    history.append({"time": datetime.now().isoformat(), "data": result})
+# chain = prompt | llm | StrOutputParser()
+# result = chain.invoke({"question": "GPU温度过高怎么办"})</code></pre></div>` }
+    ],
+    exercises: [
+      { title: "运维助手 PromptTemplate", desc: `system: "运维专家", user: {server_name} + {error_msg}`, answer: `prompt = ChatPromptTemplate.from_messages([
+    ("system", "你是GPU运维专家"),
+    ("user", "服务器 {server_name} 报错: {error_msg}")
+])`, starter: `# 定义运维助手 PromptTemplate
+` },
+      { title: "构建完整 chain", desc: `prompt | llm | parser`, answer: `from langchain_core.output_parsers import StrOutputParser
+chain = prompt | llm | StrOutputParser()
+# result = chain.invoke({"question": "如何监控GPU"})`, starter: `# 构建 chain
+` },
+      { title: "批量提问", desc: `用 chain.batch() 同时问多个问题`, answer: `questions = [{"question": q} for q in ["GPU温度", "显存不足"]]
+# results = chain.batch(questions)`, starter: `# 批量提问
+` }
+    ]
+  },
+  {
+    id: 24, title: "向量数据库", icon: "D24",
+    tag: "RAG", tagClass: "purple",
+    desc: "Embedding 概念、Chroma 向量数据库、语义检索",
+    sections: [
+      {
+        title: "什么是 Embedding",
+        content: `<div class="text-block">把文本变成数字向量，语义相近的文本向量也相近。比如"GPU过热"和"显卡温度高"的向量很接近。</div>` },
+      {
+        title: "Chroma 向量数据库",
+        content: `<div class="code-block"><div class="code-header"><span class="lang-label">python</span><button class="copy-btn" onclick="copyCode(this)">Copy</button></div><pre><code class="language-python">import chromadb
 
-    with open(filepath, "w") as f:
-        json.dump(history, f, ensure_ascii=False, indent=2)`, starter: `# 把每次巡检结果写入文件
-# 保留最近 7 天的数据
-pass
+client = chromadb.Client()
+col = client.create_collection("docs")
+
+col.add(
+    documents=["GPU温度超过85度需检查散热", "显存不足可降低batch_size"],
+    ids=["d0", "d1"]
+)
+
+results = col.query(query_texts=["GPU温度高怎么办"], n_results=2)
+print(results["documents"])</code></pre></div>` }
+    ],
+    exercises: [
+      { title: "构建文档库并检索", desc: `添加5条Docker文档，查询"查看日志"`, answer: `col = client.create_collection("docker")
+col.add(documents=[
+    "docker logs 查看容器日志",
+    "docker ps 查看运行中容器",
+], ids=["d0","d1"])
+print(col.query(query_texts=["查看日志"], n_results=2))`, starter: `# 添加Docker文档并检索
+` },
+      { title: "对比不同查询", desc: `用3个不同查询词，看结果区别`, answer: `for q in ["GPU温度", "显存不足", "启动服务"]:
+    r = col.query(query_texts=[q], n_results=2)
+    print(f"{q}: {r['documents'][0]}")`, starter: `# 对比不同查询的检索结果
+` },
+      { title: "结合 LangChain", desc: `用 Chroma.as_retriever() 构建检索器`, answer: `# from langchain_community.vectorstores import Chroma
+# from langchain_community.embeddings import HuggingFaceEmbeddings
+# embeddings = HuggingFaceEmbeddings()
+# vs = Chroma.from_texts(docs, embeddings)
+# retriever = vs.as_retriever(search_kwargs={"k": 3})`, starter: `# 用 LangChain 封装 Chroma
+` }
+    ]
+  },
+  {
+    id: 25, title: "文档加载+切割", icon: "D25",
+    tag: "RAG", tagClass: "purple",
+    desc: "加载 PDF/TXT 文档，按 chunk_size 切割成文本块",
+    sections: [
+      {
+        title: "文本切割原理",
+        content: `<div class="text-block">文档太长不能直接给模型，需要切成小块。关键参数：<code>chunk_size</code>（每块大小）和 <code>chunk_overlap</code>（重叠防截断）。</div>
+<div class="code-block"><div class="code-header"><span class="lang-label">python</span><button class="copy-btn" onclick="copyCode(this)">Copy</button></div><pre><code class="language-python">def split_text(text, chunk_size=500, overlap=100):
+    chunks = []
+    start = 0
+    while start < len(text):
+        chunks.append(text[start:start+chunk_size])
+        start += chunk_size - overlap
+    return chunks</code></pre></div>` }
+    ],
+    exercises: [
+      { title: "加载并切割 TXT", desc: `chunk_size=300, overlap=80`, answer: `def load_and_split(path, size=300, overlap=80):
+    with open(path) as f:
+        text = f.read()
+    chunks = []
+    start = 0
+    while start < len(text):
+        chunks.append(text[start:start+size])
+        start += size - overlap
+    return chunks`, starter: `# 加载TXT并按固定大小切割
+` },
+      { title: "按章节切割", desc: `输出每章标题和字数`, answer: `def split_by_chapter(text):
+    chapters, cur = [], []
+    for line in text.split("\\n"):
+        if line.strip().startswith("第") and "章" in line:
+            if cur: chapters.append("\\n".join(cur))
+            cur = [line]
+        else: cur.append(line)
+    if cur: chapters.append("\\n".join(cur))
+    return chapters`, starter: `# 按章节标题切割
+` },
+      { title: "完整 加载→切割→打印", desc: `写一个完整的文档处理函数`, answer: `def process_doc(path):
+    with open(path) as f: text = f.read()
+    chunks = split_text(text, 300, 80)
+    for i, c in enumerate(chunks):
+        print(f"块{i+1} ({len(c)}字): {c[:50]}...")
+    return chunks`, starter: `# 完整文档处理流程
+` }
+    ]
+  },
+  {
+    id: 26, title: "RAG Chain 组装", icon: "D26",
+    tag: "RAG", tagClass: "purple",
+    desc: "检索 + 生成完整链路",
+    sections: [
+      {
+        title: "RAG 全流程",
+        content: `<div class="text-block">RAG = Retrieval Augmented Generation。流程：用户提问 → 检索相关文档 → 文档+问题一起给模型 → 生成回答。</div>` },
+      {
+        title: "模拟 RAG",
+        content: `<div class="code-block"><div class="code-header"><span class="lang-label">python</span><button class="copy-btn" onclick="copyCode(this)">Copy</button></div><pre><code class="language-python">def rag(question, knowledge):
+    # 1. 检索
+    docs = [d for d in knowledge if any(w in d for w in question.split())]
+    # 2. 组装 prompt
+    context = "\\n".join(f"- {d}" for d in docs)
+    prompt = f"根据以下资料回答:\\n{context}\\n\\n问题: {question}"
+    # 3. 调模型
+    return prompt
+
+knowledge = ["GPU温度超85度检查散热", "显存不足减小batch_size"]
+print(rag("GPU温度高怎么办", knowledge))</code></pre></div>` }
+    ],
+    exercises: [
+      { title: "写 simple_search", desc: `关键词检索，返回最相关的3个文档`, answer: `def search(query, docs, top_k=3):
+    scored = [(d, sum(1 for w in query.split() if w in d)) for d in docs]
+    scored.sort(key=lambda x: -x[1])
+    return [d for d, s in scored[:top_k]]`, starter: `# 关键词检索函数
+` },
+      { title: "写 build_rag_prompt", desc: `把检索结果和问题组装成提示词`, answer: `def build_prompt(question, docs):
+    ctx = "\\n".join(f"- {d}" for d in docs)
+    return f"资料:\\n{ctx}\\n\\n问题: {question}\\n回答:"`, starter: `# 组装 RAG 提示词
+` },
+      { title: "完整 RAG 流程", desc: `加载→切割→存储→检索→生成`, answer: `def rag_pipeline(question, docs):
+    retrieved = search(question, docs)
+    prompt = build_prompt(question, retrieved)
+    return prompt`, starter: `# 完整 RAG 管道
+` }
+    ]
+  },
+  {
+    id: 27, title: "RAG + FastAPI", icon: "D27",
+    tag: "RAG", tagClass: "purple",
+    desc: "把 RAG 系统包装成完整的 API 服务",
+    sections: [
+      {
+        title: "API 接口设计",
+        content: `<div class="table-wrap"><table><tr><th>接口</th><th>方法</th><th>功能</th></tr>
+<tr><td><code>/ask</code></td><td>POST</td><td>问答接口</td></tr>
+<tr><td><code>/documents</code></td><td>POST</td><td>上传文档</td></tr>
+<tr><td><code>/documents/count</code></td><td>GET</td><td>文档数量</td></tr></table></div>` },
+      {
+        title: "核心代码",
+        content: `<div class="code-block"><div class="code-header"><span class="lang-label">python</span><button class="copy-btn" onclick="copyCode(this)">Copy</button></div><pre><code class="language-python">@app.post("/ask")
+def ask(req: QuestionRequest):
+    results = collection.query(
+        query_texts=[req.question], n_results=req.top_k
+    )
+    sources = results["documents"][0]
+    answer = f"根据资料: {sources[0]}"
+    return {"question": req.question, "answer": answer, "sources": sources}
+
+@app.post("/documents")
+def add_docs(req: DocUploadRequest):
+    collection.add(documents=req.documents,
+                   ids=[f"d_{i}" for i in range(len(req.documents))])
+    return {"added": len(req.documents)}</code></pre></div>` }
+    ],
+    exercises: [
+      { title: "搜索接口", desc: `GET /search?q=GPU温度&top_k=3`, answer: `@app.get("/search")
+def search(q: str, top_k: int = 3):
+    r = collection.query(query_texts=[q], n_results=top_k)
+    return {"query": q, "results": r["documents"][0]}`, starter: `# GET /search 搜索接口
+` },
+      { title: "文件上传接口", desc: `POST /upload 接收 TXT 文件`, answer: `@app.post("/upload")
+async def upload(file: UploadFile = File(...)):
+    content = await file.read()
+    text = content.decode("utf-8")
+    chunks = [text[i:i+500] for i in range(0, len(text), 450)]
+    start = collection.count()
+    collection.add(documents=chunks, ids=[f"u_{start+i}" for i in range(len(chunks))])
+    return {"chunks": len(chunks)}`, starter: `# 文件上传并自动切割
+` },
+      { title: "批量问答", desc: `POST /ask/batch 接收多个问题`, answer: `@app.post("/ask/batch")
+def batch(req: BatchRequest):
+    results = []
+    for q in req.questions:
+        r = collection.query(query_texts=[q], n_results=2)
+        results.append({"q": q, "sources": r["documents"][0]})
+    return {"answers": results}`, starter: `# 批量问答接口
+` }
+    ]
+  },
+  {
+    id: 28, title: "RAG 流式+优化", icon: "D28",
+    tag: "RAG", tagClass: "purple",
+    desc: "流式输出、查询重写、检索优化",
+    sections: [
+      {
+        title: "流式 RAG",
+        content: `<div class="code-block"><div class="code-header"><span class="lang-label">python</span><button class="copy-btn" onclick="copyCode(this)">Copy</button></div><pre><code class="language-python">@app.post("/chat/stream")
+async def stream_rag(req: StreamQuestion):
+    results = collection.query(query_texts=[req.question], n_results=3)
+    sources = results["documents"][0]
+    return StreamingResponse(
+        stream_response(req.question, sources),
+        media_type="text/event-stream"
+    )</code></pre></div>` },
+      {
+        title: "查询重写优化",
+        content: `<div class="text-block">用户的口语化问题不利于检索，需要重写为关键词。</div>
+<div class="code-block"><div class="code-header"><span class="lang-label">python</span><button class="copy-btn" onclick="copyCode(this)">Copy</button></div><pre><code class="language-python">def rewrite_query(query):
+    stop = ["怎么", "如何", "什么", "吗", "呢"]
+    for w in stop:
+        query = query.replace(w, "")
+    return query.strip()</code></pre></div>` }
+    ],
+    exercises: [
+      { title: "流式+来源", desc: `流式输出结束后附上来源`, answer: `async def stream_with_sources(question, sources):
+    for char in "模拟答案":
+        yield f"data: {json.dumps({'content': char})}\\n\\n"
+        await asyncio.sleep(0.01)
+    yield f"data: {json.dumps({'sources': sources})}\\n\\n"
+    yield "data: [DONE]\\n\\n"`, starter: `# 流式输出+附上来源
+` },
+      { title: "查询重写", desc: `口语→关键词`, answer: `def rewrite(query):
+    replacements = {"怎么": "方法", "如何": "方案"}
+    for old, new in replacements.items():
+        query = query.replace(old, new)
+    return query`, starter: `# 查询重写
+` },
+      { title: "评估接口", desc: `GET /eval 测试问答准确率`, answer: `test_cases = [{"q": "GPU温度", "expected": "散热"}]
+@app.get("/eval")
+def evaluate():
+    hits = 0
+    for tc in test_cases:
+        r = collection.query(query_texts=[tc["q"]], n_results=1)
+        if tc["expected"] in r["documents"][0][0]: hits += 1
+    return {"accuracy": hits / len(test_cases)}`, starter: `# 评估检索准确率
+` }
+    ]
+  },
+  {
+    id: 29, title: "Docker+K8s 部署", icon: "D29",
+    tag: "项目", tagClass: "red",
+    desc: "Docker 打包、docker-compose 编排、K8s 部署",
+    sections: [
+      {
+        title: "Dockerfile",
+        content: `<div class="code-block"><div class="code-header"><span class="lang-label">dockerfile</span><button class="copy-btn" onclick="copyCode(this)">Copy</button></div><pre><code class="language-python">FROM python:3.11-slim
+WORKDIR /app
+COPY requirements.txt .
+RUN pip install -r requirements.txt
+COPY . .
+EXPOSE 8000
+CMD ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8000"]</code></pre></div>` },
+      {
+        title: "docker-compose 编排",
+        content: `<div class="text-block">用 docker-compose 编排多个服务：RAG API + vLLM + ChromaDB。</div>
+<div class="code-block"><div class="code-header"><span class="lang-label">yaml</span><button class="copy-btn" onclick="copyCode(this)">Copy</button></div><pre><code class="language-python">services:
+  rag-api:
+    build: .
+    ports: ["8000:8000"]
+    depends_on: [vllm]
+  vllm:
+    image: vllm/vllm-openai:latest
+    command: --model qwen --tensor-parallel-size 4
+  chromadb:
+    image: chromadb/chroma:latest</code></pre></div>` }
+    ],
+    exercises: [
+      { title: "写 Dockerfile", desc: `给你的 RAG 项目写 Dockerfile`, answer: `FROM python:3.11-slim
+WORKDIR /app
+COPY requirements.txt .
+RUN pip install -r requirements.txt
+COPY . .
+EXPOSE 8000
+CMD ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8000"]`, starter: `# 写 Dockerfile
+` },
+      { title: "写 docker-compose", desc: `编排 3 个服务`, answer: `version: '3.8'
+services:
+  api:
+    build: .
+    ports: ["8000:8000"]
+    depends_on: [db]
+  db:
+    image: chromadb/chroma:latest
+    ports: ["8001:8000"]`, starter: `# 写 docker-compose.yml
+` },
+      { title: "写部署文档", desc: `README 里的部署指南`, answer: `# 部署指南
+1. docker build -t rag-api .
+2. docker-compose up -d
+3. curl http://localhost:8000/health`, starter: `# 写部署文档
+` }
+    ]
+  },
+  {
+    id: 30, title: "GitHub + 博客", icon: "D30",
+    tag: "项目", tagClass: "red",
+    desc: "项目发布到 GitHub，写技术博客",
+    sections: [
+      {
+        title: "项目 README",
+        content: `<div class="text-block">README 是项目的门面，包括：功能列表、快速开始、API 文档、技术栈。</div>
+<div class="code-block"><div class="code-header"><span class="lang-label">markdown</span><button class="copy-btn" onclick="copyCode(this)">Copy</button></div><pre><code class="language-python"># RAG 模型服务 API
+
+## 功能
+- 文档上传和自动切割
+- 向量检索 + 大模型生成
+- 流式输出
+
+## 快速开始
+\`\`\`bash
+pip install -r requirements.txt
+uvicorn main:app --reload
+\`\`\`
+
+## 技术栈
+FastAPI + LangChain + ChromaDB + vLLM</code></pre></div>` },
+      {
+        title: "30天回顾",
+        content: `<div class="table-wrap"><table><tr><th>阶段</th><th>天数</th><th>内容</th></tr>
+<tr><td>基础</td><td>Day 1-5</td><td>变量、字符串、列表、字典、JSON</td></tr>
+<tr><td>核心</td><td>Day 6-11</td><td>if/else、循环、函数、文件、异常、模块</td></tr>
+<tr><td>进阶</td><td>Day 12-14</td><td>class、装饰器+async、Pydantic</td></tr>
+<tr><td>实战</td><td>Day 15-17</td><td>requests、subprocess</td></tr>
+<tr><td>FastAPI</td><td>Day 18-22</td><td>路由、请求体、流式、中间件、实战</td></tr>
+<tr><td>RAG</td><td>Day 23-28</td><td>LangChain、向量库、切割、Chain、集成、优化</td></tr>
+<tr><td>项目</td><td>Day 29-30</td><td>Docker部署、博客发布</td></tr></table></div>` }
+    ],
+    exercises: [
+      { title: "写 README", desc: `为你的项目写一个 README.md`, answer: `# My RAG Project
+
+## 快速开始
+\`\`\`bash
+docker-compose up -d
+\`\`\`
+
+## API
+POST /ask - 问答
+POST /documents - 上传文档
+
+## 技术栈
+FastAPI + LangChain + ChromaDB`, starter: `# 写 README
+` },
+      { title: "写技术博客", desc: `500字以上，记录学习过程和踩坑`, answer: `# 30天从零搭建RAG系统
+
+## 为什么做这个项目
+运维工程师需要自动化工具...
+
+## 技术选型
+FastAPI vs Flask: 性能和自动文档...
+
+## 踩坑记录
+1. ChromaDB 文档切割大小影响检索质量
+2. 流式输出需要 SSE 格式
+3. Docker GPU 直通配置`, starter: `# 写技术博客
+` },
+      { title: "推送到 GitHub", desc: `确保 README 正常显示，检查 .gitignore`, answer: `git init
+echo "__pycache__/" >> .gitignore
+echo ".env" >> .gitignore
+git add .
+git commit -m "feat: RAG知识库问答系统"
+git remote add origin https://github.com/you/your-repo.git
+git push -u origin main`, starter: `# 推送到 GitHub
 ` }
     ]
   }
@@ -3610,10 +4066,12 @@ function renderNav() {
   const nav = document.getElementById('navList');
   let html = '<div class="nav-section">基础阶段</div>';
   courses.forEach(c => {
-    if (c.id === 5) html += '<div class="nav-section">核心阶段</div>';
-    if (c.id === 9) html += '<div class="nav-section">进阶阶段</div>';
-    if (c.id === 11) html += '<div class="nav-section">实战阶段</div>';
-    if (c.id === 18) html += '<div class="nav-section">整合阶段</div>';
+    if (c.id === 6) html += '<div class="nav-section">核心阶段</div>';
+    if (c.id === 12) html += '<div class="nav-section">进阶阶段</div>';
+    if (c.id === 15) html += '<div class="nav-section">实战阶段</div>';
+    if (c.id === 18) html += '<div class="nav-section">FastAPI阶段</div>';
+    if (c.id === 23) html += '<div class="nav-section">RAG阶段</div>';
+    if (c.id === 29) html += '<div class="nav-section">项目收尾</div>';
     const isActive = c.id === getCurrentDay() ? 'active' : '';
     html += `<div class="nav-item ${isActive}" data-id="${c.id}" onclick="loadDay(${c.id})">
       <span class="nav-icon pending">${c.icon}</span>

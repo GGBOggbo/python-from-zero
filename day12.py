@@ -1,178 +1,156 @@
 # ============================================================
-# Day 12: requests 进阶 — 超时/重试/错误处理/流式
-# 目标：写生产级 HTTP 请求代码，不怕网络抖动
+# Day 12: class 基础认识
+# 目标：能看懂别人代码里的 class，能写简单的类
 # 用法：python day12.py 逐段运行，改一改，看看结果变不变
 # ============================================================
 
-import requests
-import time
-import json
+# --------------------------------------------------
+# 1. 什么是类（class）
+# --------------------------------------------------
+# 类 = 模板/图纸，用来创建对象
+# 比如 "服务器" 是一个类，gpu-01、gpu-02 是具体的对象（实例）
+
+# 定义一个最简单的类
+class Server:
+    def __init__(self, name, ip):
+        # __init__ 是初始化方法，创建对象时自动调用
+        # self 指的是"这个对象本身"
+        self.name = name    # 实例属性
+        self.ip = ip        # 实例属性
+
+# 创建对象（实例化）
+s1 = Server("gpu-01", "10.0.0.1")
+s2 = Server("gpu-02", "10.0.0.2")
+
+print(s1.name)  # gpu-01
+print(s2.ip)    # 10.0.0.2
 
 # --------------------------------------------------
-# 1. 超时设置
+# 2. 实例方法
 # --------------------------------------------------
-# 不设超时 = 请求可能永远卡住，这是生产事故的常见原因
+class GPUServer:
+    def __init__(self, name, gpu_count=4):
+        self.name = name
+        self.gpu_count = gpu_count
+        self.status = "offline"  # 默认离线
 
-# timeout 参数有两种写法
-# timeout=5         → 连接+读取共用 5 秒
-# timeout=(3, 10)   → 连接超时 3 秒，读取超时 10 秒
+    def start(self):
+        self.status = "running"
+        print(f"{self.name} 已启动，{self.gpu_count} 张 GPU")
 
-# 推荐写法：分别设置
-try:
-    resp = requests.get("https://httpbin.org/delay/1", timeout=(3, 10))
-    print(f"请求成功: {resp.status_code}")
-except requests.exceptions.Timeout:
-    print("请求超时了！")
+    def stop(self):
+        self.status = "stopped"
+        print(f"{self.name} 已停止")
 
-# 超时值怎么选？
-# 健康检查（/health）: timeout=(2, 3)    # 服务应该秒回
-# 普通查询（/v1/models）: timeout=(3, 10)  # 列表查询不急
-# 聊天请求（/v1/chat/completions）: timeout=(5, 120)  # 模型推理可能很慢
+    def info(self):
+        print(f"名称: {self.name}, GPU: {self.gpu_count}, 状态: {self.status}")
 
-# --------------------------------------------------
-# 2. 错误处理
-# --------------------------------------------------
-# 网络请求可能出各种错，必须处理
-
-def safe_request_demo():
-    """演示各种错误处理"""
-    url = "http://localhost:9999/health"  # 假设这个服务不存在
-
-    try:
-        resp = requests.get(url, timeout=3)
-        resp.raise_for_status()  # 状态码 4xx/5xx 会抛 HTTPError
-        return resp.json()
-    except requests.exceptions.ConnectionError:
-        print("连接失败：服务未启动或地址错误")
-    except requests.exceptions.Timeout:
-        print("请求超时：服务响应太慢")
-    except requests.exceptions.HTTPError as e:
-        print(f"HTTP 错误：{e.response.status_code}")
-    except requests.exceptions.RequestException as e:
-        print(f"请求异常：{e}")
-
-    return None
-
-result = safe_request_demo()
-print(f"返回结果: {result}")
+server = GPUServer("gpu-01", gpu_count=8)
+server.start()
+server.info()
 
 # --------------------------------------------------
-# 3. 重试机制
+# 3. 不用精通 OOP，能看懂就行
 # --------------------------------------------------
-# 网络偶尔抖动很正常，重试几次就好
+# 你在别人代码里会看到这样的东西：
+#
+# class ModelClient:
+#     def __init__(self, base_url, model_name):
+#         self.base_url = base_url
+#         self.model = model_name
+#
+#     def chat(self, question):
+#         resp = requests.post(f"{self.base_url}/v1/chat/completions", ...)
+#         return resp.json()
+#
+# client = ModelClient("http://localhost:8000", "qwen")
+# answer = client.chat("你好")
 
-def request_with_retry(url, max_retries=3, timeout=5):
-    """带重试的请求"""
-    for attempt in range(1, max_retries + 1):
-        try:
-            resp = requests.get(url, timeout=timeout)
-            resp.raise_for_status()
-            return resp
-        except requests.exceptions.RequestException as e:
-            print(f"第 {attempt} 次请求失败: {e}")
-            if attempt < max_retries:
-                # 指数退避：1秒、2秒、4秒...
-                wait = 2 ** (attempt - 1)
-                print(f"等待 {wait} 秒后重试...")
-                time.sleep(wait)
-            else:
-                print(f"重试 {max_retries} 次后仍然失败，放弃")
-    return None
-
-# 演示（这个 URL 会返回 404，模拟失败）
-# resp = request_with_retry("https://httpbin.org/status/404", max_retries=2)
+# 你只需要知道：
+# 1. __init__ 是初始化，self.xxx 是属性
+# 2. def xxx(self) 是方法，用 对象.方法名() 调用
+# 3. 不需要理解继承、多态这些高级概念
 
 # --------------------------------------------------
-# 4. Session 复用连接
+# 4. 实际场景：定义模型服务类
 # --------------------------------------------------
-# 每次 requests.get() 都建新连接，效率低
-# 用 Session 复用 TCP 连接，还能统一设置 headers
+class ModelService:
+    def __init__(self, name, port, model_path):
+        self.name = name
+        self.port = port
+        self.model_path = model_path
+        self.is_running = False
 
-# 不用 Session（每次都新建连接）
-# for i in range(3):
-#     requests.get("http://localhost:8000/health")  # 3 次 TCP 握手
+    def start(self):
+        self.is_running = True
+        print(f"启动 {self.name}，模型: {self.model_path}，端口: {self.port}")
 
-# 用 Session（复用连接，快！）
-session = requests.Session()
-session.headers.update({"Authorization": "Bearer your-token-here"})
+    def stop(self):
+        self.is_running = False
+        print(f"停止 {self.name}")
 
-# 模拟用 Session 发请求
-try:
-    resp = session.get("https://httpbin.org/headers", timeout=5)
-    print(f"\nSession 请求成功，Headers 里有我们设置的 token")
-except Exception:
-    pass
+    def check(self):
+        status = "运行中" if self.is_running else "已停止"
+        print(f"{self.name} ({self.model_path}): {status}")
 
-# with 语句确保资源释放
-with requests.Session() as s:
-    s.headers.update({"Content-Type": "application/json"})
-    # 所有请求共享这个 header
-    # resp = s.get("http://localhost:8000/v1/models")
-    # resp = s.post("http://localhost:8000/v1/chat/completions", json=data)
-    pass
+# 创建多个服务
+services = [
+    ModelService("vllm-qwen", 8000, "/models/qwen-72b"),
+    ModelService("vllm-llama", 8001, "/models/llama-70b"),
+    ModelService("sglang-deepseek", 8002, "/models/deepseek-v3"),
+]
+
+services[0].start()
+services[1].start()
+
+for s in services:
+    s.check()
 
 # --------------------------------------------------
-# 5. 流式响应 (Streaming)
+# 5. 继承（简单认识）
 # --------------------------------------------------
-# 聊天 API 支持 stream=True，逐字返回模型输出
-# 就像 ChatGPT 那样一个字一个字蹦出来
+# 继承 = 子类复用父类的代码
+# 你可能在 FastAPI/Pydantic 代码里看到：
 
-def stream_chat(url="http://localhost:8000/v1/chat/completions"):
-    """流式请求示例"""
-    data = {
-        "model": "qwen",
-        "messages": [{"role": "user", "content": "用一句话介绍 GPU"}],
-        "stream": True,
-    }
+class BaseService:
+    def __init__(self, name):
+        self.name = name
 
-    try:
-        resp = requests.post(url, json=data, stream=True, timeout=120)
-        resp.raise_for_status()
+    def log(self, msg):
+        print(f"[{self.name}] {msg}")
 
-        print("模型输出: ", end="")
-        for line in resp.iter_lines():
-            if not line:
-                continue
-            line = line.decode("utf-8")
-            # SSE 格式: "data: {...}"
-            if line.startswith("data: "):
-                payload = line[6:]  # 去掉 "data: " 前缀
-                if payload == "[DONE]":
-                    print("\n[完成]")
-                    break
-                chunk = json.loads(payload)
-                delta = chunk["choices"][0]["delta"]
-                if "content" in delta:
-                    print(delta["content"], end="", flush=True)
-    except Exception as e:
-        print(f"流式请求失败: {e}")
+class GPUService(BaseService):  # 继承 BaseService
+    def __init__(self, name, gpu_count):
+        super().__init__(name)  # 调用父类的 __init__
+        self.gpu_count = gpu_count
 
-# 取消注释运行（需要本地有大模型服务）
-# stream_chat()
+svc = GPUService("gpu-01", 8)
+svc.log(f"有 {svc.gpu_count} 张 GPU")  # 继承来的 log 方法
 
 # --------------------------------------------------
 # 6. 小练习（先自己写，写不出再看下面的参考答案）
 # --------------------------------------------------
 
-# 练习1：带超时和重试的请求函数
-# 写一个函数 safe_get(url, timeout=5, retries=3)
-# 实现超时+重试+错误处理，返回 response 或 None
+# 练习1：定义 GPU 信息类
+# 属性：index, name, temperature, utilization
+# 方法：is_overheating() 温度>85返回True
 
 # ====== 在这里写你的代码 ======
 
 
 
 
-# 练习2：批量检查服务状态（健壮版）
-# 给定服务列表，用 safe_get 检查每个服务，输出状态表格
+# 练习2：定义服务配置类
+# 属性：name, port, model, status
+# 方法：start(), stop(), __str__ 返回配置字符串
 
 # ====== 在这里写你的代码 ======
 
 
 
 
-# 练习3：流式请求示例
-# 用 stream=True 调用 /v1/chat/completions，实时打印模型输出
+# 练习3：用类管理多个服务
+# 创建 3 个 ModelService 对象，存入列表，批量启动并检查状态
 
 # ====== 在这里写你的代码 ======
 
@@ -182,64 +160,51 @@ def stream_chat(url="http://localhost:8000/v1/chat/completions"):
 # --------------------------------------------------
 # 练习1 参考答案（先自己写！）
 # --------------------------------------------------
-# import requests
-# import time
-#
-# def safe_get(url, timeout=5, retries=3):
-#     for attempt in range(1, retries + 1):
-#         try:
-#             resp = requests.get(url, timeout=timeout)
-#             resp.raise_for_status()
-#             return resp
-#         except requests.exceptions.RequestException as e:
-#             print(f"  第 {attempt}/{retries} 次失败: {type(e).__name__}")
-#             if attempt < retries:
-#                 time.sleep(2 ** (attempt - 1))
-#     return None
+# class GPU:
+#     def __init__(self, index, name, temperature, utilization):
+#         self.index = index
+#         self.name = name
+#         self.temperature = temperature
+#         self.utilization = utilization
+#     def is_overheating(self):
+#         return self.temperature > 85
+# g = GPU(0, "A100", 92, 85)
+# print(f"过热: {g.is_overheating()}")
 
 # --------------------------------------------------
 # 练习2 参考答案（先自己写！）
 # --------------------------------------------------
-# services = [
-#     {"name": "vllm-qwen", "url": "http://gpu-01:8000/health"},
-#     {"name": "vllm-llama", "url": "http://gpu-02:8000/health"},
-#     {"name": "sglang-deepseek", "url": "http://gpu-03:8000/health"},
-# ]
-#
-# print(f"{'服务名':<20} {'状态'}")
-# print("-" * 35)
-# for svc in services:
-#     resp = safe_get(svc["url"], timeout=3, retries=2)
-#     status = "正常" if resp else "异常"
-#     print(f"{svc['name']:<20} {status}")
+# class ServiceConfig:
+#     def __init__(self, name, port, model):
+#         self.name = name
+#         self.port = port
+#         self.model = model
+#         self.status = "stopped"
+#     def start(self):
+#         self.status = "running"
+#     def stop(self):
+#         self.status = "stopped"
+#     def __str__(self):
+#         return f"{self.name} ({self.model}) port={self.port} [{self.status}]"
+# s = ServiceConfig("vllm", 8000, "qwen")
+# s.start()
+# print(s)
 
 # --------------------------------------------------
 # 练习3 参考答案（先自己写！）
 # --------------------------------------------------
-# import requests
-# import json
-#
-# url = "http://localhost:8000/v1/chat/completions"
-# data = {
-#     "model": "qwen",
-#     "messages": [{"role": "user", "content": "写一首关于GPU的诗"}],
-#     "stream": True,
-# }
-#
-# try:
-#     resp = requests.post(url, json=data, stream=True, timeout=120)
-#     for line in resp.iter_lines():
-#         if not line:
-#             continue
-#         line = line.decode("utf-8")
-#         if line.startswith("data: "):
-#             payload = line[6:]
-#             if payload == "[DONE]":
-#                 break
-#             chunk = json.loads(payload)
-#             delta = chunk["choices"][0]["delta"]
-#             if "content" in delta:
-#                 print(delta["content"], end="", flush=True)
-#     print()
-# except Exception as e:
-#     print(f"请求失败: {e}")
+# class ModelService:
+#     def __init__(self, name, port):
+#         self.name = name
+#         self.port = port
+#         self.status = "stopped"
+#     def start(self):
+#         self.status = "running"
+#         print(f"{self.name} 已启动")
+#     def check(self):
+#         print(f"{self.name}: {self.status}")
+# services = [ModelService("qwen", 8000), ModelService("llama", 8001), ModelService("deepseek", 8002)]
+# for s in services:
+#     s.start()
+# for s in services:
+#     s.check()

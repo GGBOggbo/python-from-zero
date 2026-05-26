@@ -1,159 +1,165 @@
 # ============================================================
-# Day 13: subprocess — 在 Python 里跑系统命令
-# 目标：能用 Python 调 nvidia-smi、docker 等运维命令
+# Day 13: 装饰器 + async/await
+# 目标：能看懂装饰器和异步代码，为学 FastAPI 做准备
 # 用法：python day13.py 逐段运行，改一改，看看结果变不变
 # ============================================================
 
-import subprocess
+import time
+import asyncio
 
 # --------------------------------------------------
-# 1. subprocess.run 基础
+# 1. 装饰器：@xxx 就是给函数"包一层"
 # --------------------------------------------------
-# 最常用的方式，执行一条命令并等待结果
+# 你不需要理解装饰器的原理
+# 只需要知道：@xxx 写在函数上面，会给函数增加功能
 
-result = subprocess.run(["echo", "hello from subprocess"], capture_output=True, text=True)
-print(f"标准输出: {result.stdout.strip()}")
-print(f"返回码: {result.returncode}")  # 0 表示成功
+# FastAPI 里你会看到这样的代码：
+# @app.get("/chat")
+# async def chat(question: str):
+#     return {"answer": "hello"}
 
-# 关键参数：
-# capture_output=True  → 捕获 stdout 和 stderr
-# text=True            → 输出是字符串（不是 bytes）
-# check=True           → 返回码非 0 时直接抛异常
-
-# --------------------------------------------------
-# 2. 获取命令输出
-# --------------------------------------------------
-# 运维最常用：获取命令输出并解析
-
-# 获取当前 Python 版本
-result = subprocess.run(["python3", "--version"], capture_output=True, text=True)
-print(f"Python 版本: {result.stdout.strip()}")
-
-# 获取磁盘使用情况
-result = subprocess.run(["df", "-h", "/"], capture_output=True, text=True)
-print(f"磁盘信息:\n{result.stdout}")
-
-# 模拟解析 nvidia-smi（实际环境取消注释）
-# result = subprocess.run(
-#     ["nvidia-smi", "--query-gpu=index,name,utilization.gpu,temperature.gpu,memory.used,memory.total",
-#      "--format=csv,noheader,nounits"],
-#     capture_output=True, text=True
-# )
-# for line in result.stdout.strip().split("\n"):
-#     parts = line.split(", ")
-#     print(f"GPU {parts[0]}: {parts[1]}, 利用率 {parts[2]}%, 温度 {parts[3]}°C")
-
-# 解析 docker ps 输出
-# result = subprocess.run(
-#     ["docker", "ps", "--format", "table {{.Names}}\t{{.Status}}\t{{.Ports}}"],
-#     capture_output=True, text=True
-# )
-# print(result.stdout)
+# @app.get("/chat") 就是一个装饰器
+# 它把普通函数变成了一个 API 接口
 
 # --------------------------------------------------
-# 3. 封装常用函数
+# 2. 写一个简单装饰器（了解即可）
 # --------------------------------------------------
-# 每次都写 subprocess.run 太长，封装一下
+def timer(func):
+    """计算函数执行时间的装饰器"""
+    def wrapper(*args, **kwargs):
+        start = time.time()
+        result = func(*args, **kwargs)
+        elapsed = time.time() - start
+        print(f"  耗时: {elapsed:.3f}秒")
+        return result
+    return wrapper
 
-def run_cmd(cmd, check=False):
-    """执行命令，返回 (成功, 标准输出, 错误输出)"""
-    try:
-        if isinstance(cmd, str):
-            cmd = cmd.split()
-        result = subprocess.run(cmd, capture_output=True, text=True, timeout=30)
-        if check and result.returncode != 0:
-            print(f"命令失败: {' '.join(cmd)}")
-            print(f"错误: {result.stderr}")
-        return result.returncode == 0, result.stdout, result.stderr
-    except FileNotFoundError:
-        return False, "", f"命令不存在: {cmd[0]}"
-    except subprocess.TimeoutExpired:
-        return False, "", "命令执行超时"
+@timer
+def slow_task():
+    """被装饰的函数"""
+    time.sleep(0.1)
+    print("任务完成")
 
-# 使用封装函数
-ok, out, err = run_cmd("python3 --version")
-print(f"成功: {ok}, 输出: {out.strip()}")
+slow_task()  # 自动打印耗时
 
-# --------------------------------------------------
-# 4. 管道和 shell=True
-# --------------------------------------------------
-# 有时需要管道 | 或 shell 特性，用 shell=True
-# 但 shell=True 有注入风险，尽量不用
-
-# 不推荐：shell=True（有安全风险）
-# subprocess.run("ls -la | grep py", shell=True)
-
-# 推荐：用列表传参（安全）
-subprocess.run(["ls", "-la"], capture_output=True, text=True)
-
-# 如果必须用管道，用 Popen 连接
-# p1 = subprocess.Popen(["nvidia-smi"], stdout=subprocess.PIPE)
-# p2 = subprocess.Popen(["grep", "python"], stdin=p1.stdout, stdout=subprocess.PIPE)
-# output = p2.communicate()[0].decode()
+# 等价于：
+# slow_task = timer(slow_task)
 
 # --------------------------------------------------
-# 5. 实际场景：GPU 状态巡检脚本
+# 3. 常见装饰器
 # --------------------------------------------------
 
-def get_gpu_info():
-    """获取 GPU 信息（需要 nvidia-smi）"""
-    ok, out, err = run_cmd([
-        "nvidia-smi",
-        "--query-gpu=index,name,utilization.gpu,temperature.gpu,memory.used,memory.total",
-        "--format=csv,noheader,nounits"
-    ])
+# @property — 把方法变成属性
+class Server:
+    def __init__(self, name, gpu_count):
+        self.name = name
+        self.gpu_count = gpu_count
 
-    if not ok:
-        print(f"获取 GPU 信息失败: {err}")
-        return []
+    @property
+    def info(self):
+        return f"{self.name} ({self.gpu_count} GPUs)"
 
-    gpus = []
-    for line in out.strip().split("\n"):
-        if not line.strip():
-            continue
-        parts = [p.strip() for p in line.split(",")]
-        gpu = {
-            "index": int(parts[0]),
-            "name": parts[1],
-            "utilization": float(parts[2]),
-            "temperature": float(parts[3]),
-            "memory_used": float(parts[4]),
-            "memory_total": float(parts[5]),
-        }
-        gpus.append(gpu)
-    return gpus
+s = Server("gpu-01", 8)
+print(s.info)  # 注意：不用加括号
 
-# 模拟巡检输出（实际环境取消注释 get_gpu_info 调用）
-# gpus = get_gpu_info()
-# print(f"{'GPU':<6} {'名称':<20} {'利用率':<10} {'温度':<10} {'显存':<15}")
-# print("-" * 65)
-# for g in gpus:
-#     mem_pct = g['memory_used'] / g['memory_total'] * 100
-#     print(f"{g['index']:<6} {g['name']:<20} {g['utilization']:.0f}%{'':<6} "
-#           f"{g['temperature']:.0f}°C{'':<5} {g['memory_used']}/{g['memory_total']}GB ({mem_pct:.0f}%)")
+# @staticmethod — 不需要 self 的方法
+class Math:
+    @staticmethod
+    def add(a, b):
+        return a + b
+
+print(Math.add(1, 2))
 
 # --------------------------------------------------
-# 6. 小练习（先自己写，写不出再看下面的参考答案）
+# 4. async/await 基础
+# --------------------------------------------------
+# async def 定义异步函数
+# await 等待异步操作完成
+# 好处：等待的时候不阻塞其他请求
+
+# 同步版本（一个一个等）
+def sync_call(name, seconds):
+    print(f"  开始: {name}")
+    time.sleep(seconds)
+    print(f"  完成: {name}")
+
+# 异步版本（等待时可以干别的）
+async def async_call(name, seconds):
+    print(f"  开始: {name}")
+    await asyncio.sleep(seconds)  # 非阻塞等待
+    print(f"  完成: {name}")
+
+# --------------------------------------------------
+# 5. asyncio.gather — 同时做多个事
+# --------------------------------------------------
+async def main():
+    # 同时发3个请求，总时间 = 最慢的那个
+    print("=== 并发执行 ===")
+    await asyncio.gather(
+        async_call("请求A", 0.3),
+        async_call("请求B", 0.2),
+        async_call("请求C", 0.1),
+    )
+
+asyncio.run(main())
+
+# 对比同步执行（串行）
+print("\n=== 串行执行 ===")
+start = time.time()
+sync_call("请求A", 0.3)
+sync_call("请求B", 0.2)
+sync_call("请求C", 0.1)
+print(f"串行总耗时: {time.time()-start:.1f}秒")
+
+# --------------------------------------------------
+# 6. 为什么要学这个？因为 FastAPI！
+# --------------------------------------------------
+# FastAPI 的每个接口都长这样：
+#
+# from fastapi import FastAPI
+# app = FastAPI()
+#
+# @app.get("/chat")              # ← 装饰器
+# async def chat(question: str): # ← 异步函数
+#     result = await call_model(question)  # ← await
+#     return result
+#
+# 不懂装饰器和 async，FastAPI 代码你一行都看不懂
+
+# 模拟 FastAPI 风格
+async def call_model(question):
+    await asyncio.sleep(0.1)  # 模拟模型推理
+    return f"回答: {question}"
+
+async def chat(question: str):
+    result = await call_model(question)
+    return result
+
+answer = asyncio.run(chat("GPU温度过高怎么办"))
+print(f"\n{answer}")
+
+# --------------------------------------------------
+# 7. 小练习（先自己写，写不出再看下面的参考答案）
 # --------------------------------------------------
 
-# 练习1：封装 run_cmd 函数
-# 接收命令字符串或列表，返回 (success, stdout, stderr)，处理异常
+# 练习1：写一个计时装饰器
+# 给任意函数加执行时间打印
 
 # ====== 在这里写你的代码 ======
 
 
 
 
-# 练习2：GPU 信息采集脚本
-# 调用 nvidia-smi，解析输出，打印每张 GPU 的使用率和温度
+# 练习2：异步请求函数
+# 用 async def + asyncio.sleep 模拟异步 API 调用
 
 # ====== 在这里写你的代码 ======
 
 
 
 
-# 练习3：Docker 容器状态检查
-# 调 docker ps -a，输出每个容器的名称、状态、端口映射
+# 练习3：asyncio.gather 并发请求
+# 同时发 5 个模拟请求，打印总耗时
 
 # ====== 在这里写你的代码 ======
 
@@ -163,73 +169,40 @@ def get_gpu_info():
 # --------------------------------------------------
 # 练习1 参考答案（先自己写！）
 # --------------------------------------------------
-# import subprocess
-#
-# def run_cmd(cmd, check=False):
-#     try:
-#         if isinstance(cmd, str):
-#             cmd = cmd.split()
-#         result = subprocess.run(cmd, capture_output=True, text=True, timeout=30)
-#         return result.returncode == 0, result.stdout, result.stderr
-#     except FileNotFoundError:
-#         return False, "", f"命令不存在: {cmd[0]}"
-#     except subprocess.TimeoutExpired:
-#         return False, "", "命令执行超时"
-#     except Exception as e:
-#         return False, "", str(e)
-#
-# # 测试
-# ok, out, err = run_cmd("python3 --version")
-# print(f"成功: {ok}, 输出: {out.strip()}")
+# import time
+# def timer(func):
+#     def wrapper(*args, **kwargs):
+#         start = time.time()
+#         result = func(*args, **kwargs)
+#         print(f"{func.__name__} 耗时: {time.time()-start:.3f}秒")
+#         return result
+#     return wrapper
+# @timer
+# def my_func():
+#     time.sleep(0.1)
+# my_func()
 
 # --------------------------------------------------
 # 练习2 参考答案（先自己写！）
 # --------------------------------------------------
-# import subprocess
-#
-# def get_gpu_info():
-#     result = subprocess.run(
-#         ["nvidia-smi", "--query-gpu=index,utilization.gpu,temperature.gpu,memory.used,memory.total",
-#          "--format=csv,noheader,nounits"],
-#         capture_output=True, text=True
-#     )
-#     if result.returncode != 0:
-#         print(f"执行失败: {result.stderr}")
-#         return
-#
-#     print(f"{'GPU':<6} {'利用率':<10} {'温度':<10} {'显存使用':<15}")
-#     print("-" * 45)
-#     for line in result.stdout.strip().split("\n"):
-#         parts = [p.strip() for p in line.split(", ")]
-#         mem_pct = float(parts[3]) / float(parts[4]) * 100
-#         print(f"{parts[0]:<6} {parts[1]}%{'':<6} {parts[2]}°C{'':<5} "
-#               f"{parts[3]}/{parts[4]}GB ({mem_pct:.0f}%)")
-#
-# get_gpu_info()
+# import asyncio
+# async def call_api(url):
+#     print(f"请求: {url}")
+#     await asyncio.sleep(0.5)
+#     return f"{url} 的响应"
+# result = asyncio.run(call_api("http://localhost:8000/health"))
+# print(result)
 
 # --------------------------------------------------
 # 练习3 参考答案（先自己写！）
 # --------------------------------------------------
-# import subprocess
-#
-# def check_containers():
-#     result = subprocess.run(
-#         ["docker", "ps", "-a", "--format", "{{.Names}}\t{{.Status}}\t{{.Ports}}"],
-#         capture_output=True, text=True
-#     )
-#     if result.returncode != 0:
-#         print(f"执行失败: {result.stderr}")
-#         return
-#
-#     print(f"{'容器名':<25} {'状态':<20} {'端口'}")
-#     print("-" * 70)
-#     for line in result.stdout.strip().split("\n"):
-#         if not line.strip():
-#             continue
-#         parts = line.split("\t")
-#         name = parts[0] if len(parts) > 0 else ""
-#         status = parts[1] if len(parts) > 1 else ""
-#         ports = parts[2] if len(parts) > 2 else ""
-#         print(f"{name:<25} {status:<20} {ports}")
-#
-# check_containers()
+# import asyncio, time
+# async def request(i):
+#     await asyncio.sleep(0.1)
+#     return f"结果{i}"
+# async def main():
+#     start = time.time()
+#     results = await asyncio.gather(*[request(i) for i in range(5)])
+#     print(f"结果: {results}")
+#     print(f"总耗时: {time.time()-start:.2f}秒")
+# asyncio.run(main())
